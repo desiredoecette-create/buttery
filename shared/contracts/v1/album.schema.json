@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://buttery.app/contracts/v1/album.schema.json",
+  "title": "Album",
+  "type": "object",
+  "required": ["id", "ownerId", "name", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "ownerId": { "type": "string" },
+    "name": { "type": "string" },
+    "customCoverImageUrl": { "type": ["string", "null"], "format": "uri" },
+    "createdAt": { "type": "integer" },
+    "updatedAt": { "type": "integer" },
+    "schemaVersion": { "type": "integer", "const": 1 }
+  },
+  "additionalProperties": true
+}

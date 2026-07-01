@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow create: if ownsUser(userId);
+      allow read, update, delete: if ownsUser(userId);
+    }
+
+    // Public lookup contains only the UID needed to address a share. Reserve/release this
+    // document in the same transaction as a profile username change.
+    match /usernames/{usernameLowercase} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && !exists(/databases/$(database)/documents/usernames/$(usernameLowercase));
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /recipes/{recipeId} {
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /albums/{albumId} {
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /recipeShares/{shareId} {
+      allow create: if signedIn()
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.toUserId is string
+        && request.resource.data.recipeSnapshot is map;
+      allow read: if signedIn()
+        && (resource.data.toUserId == request.auth.uid
+          || resource.data.fromUserId == request.auth.uid);
+      allow update: if signedIn()
+        && resource.data.toUserId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+  }
+}

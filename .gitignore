@@ -1,0 +1,42 @@
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+captures/
+navigation.xml
+
+# Gradle / Kotlin
+.gradle/
+.gradle-user-home/
+.kotlin/
+**/build/
+
+# Local Android configuration and signing
+local.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# Firebase local state and app/environment configuration
+**/google-services.json
+**/GoogleService-Info.plist
+**/service-account*.json
+**/*-firebase-adminsdk-*.json
+backend/.firebase/
+backend/.firebaserc
+backend/functions/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Xcode user and generated data
+ios/DerivedData/
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+*.xcuserstate

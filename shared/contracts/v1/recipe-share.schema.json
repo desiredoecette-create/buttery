@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://buttery.app/contracts/v1/recipe-share.schema.json",
+  "title": "RecipeShare",
+  "type": "object",
+  "required": ["shareId", "fromUserId", "toUserId", "recipeSnapshot", "status", "createdAt", "updatedAt"],
+  "properties": {
+    "shareId": { "type": "string" },
+    "sourceRecipeId": { "type": "string" },
+    "fromUserId": { "type": "string" },
+    "fromUsername": { "type": "string" },
+    "toUserId": { "type": "string" },
+    "toUsername": { "type": "string" },
+    "recipeSnapshot": { "type": "object" },
+    "message": { "type": "string" },
+    "status": { "enum": ["pending", "viewed", "accepted", "dismissed"] },
+    "createdAt": { "type": "integer" },
+    "updatedAt": { "type": "integer" },
+    "schemaVersion": { "type": "integer", "const": 1 }
+  },
+  "additionalProperties": true
+}

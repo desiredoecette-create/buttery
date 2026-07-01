@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://buttery.app/contracts/v1/recipe.schema.json",
+  "title": "Recipe",
+  "type": "object",
+  "required": ["id", "ownerId", "title", "ingredients", "instructions", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "ownerId": { "type": "string" },
+    "title": { "type": "string" },
+    "notes": { "type": "string" },
+    "prepTime": { "type": "string" },
+    "cookTime": { "type": "string" },
+    "totalTime": { "type": "string" },
+    "servings": { "type": "string" },
+    "ingredients": { "type": "string" },
+    "instructions": { "type": "string" },
+    "photoUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+    "videoUrl": { "type": ["string", "null"], "format": "uri" },
+    "sourceUrl": { "type": ["string", "null"], "format": "uri" },
+    "originalRawText": { "type": "string" },
+    "albumId": { "type": ["string", "null"] },
+    "isFavorite": { "type": "boolean" },
+    "createdAt": { "type": "integer" },
+    "updatedAt": { "type": "integer" },
+    "schemaVersion": { "type": "integer", "const": 1 }
+  },
+  "additionalProperties": true
+}
