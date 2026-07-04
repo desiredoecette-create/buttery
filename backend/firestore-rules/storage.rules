@@ -4,14 +4,23 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /users/{userId}/profile/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     match /users/{userId}/recipes/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Authenticated recipients need read access to immutable media copied into a recipe share.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Account deletion recursively enumerates the signed-in user's folder before removing it.
+    // This grants folder listing only to that folder's owner; it does not broaden file reads.
+    match /users/{userId}/{allPaths=**} {
+      allow list: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

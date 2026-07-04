@@ -47,7 +47,10 @@ service cloud.firestore {
         && resource.data.toUserId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'updatedAt']);
-      allow delete: if false;
+      // Either participant may remove a share while deleting their Buttery account.
+      allow delete: if signedIn()
+        && (resource.data.toUserId == request.auth.uid
+          || resource.data.fromUserId == request.auth.uid);
     }
   }
 }

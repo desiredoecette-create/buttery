@@ -1,0 +1,231 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00100000000000000000001 /* ButteryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000001 /* ButteryApp.swift */; };
+		A00100000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000002 /* AppState.swift */; };
+		A00100000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000003 /* RootView.swift */; };
+		A00100000000000000000004 /* ButteryTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000004 /* ButteryTheme.swift */; };
+		A00100000000000000000005 /* Recipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000005 /* Recipe.swift */; };
+		A00100000000000000000006 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000006 /* IntroView.swift */; };
+		A00100000000000000000007 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000007 /* HomeView.swift */; };
+		A00100000000000000000008 /* FeaturePlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000008 /* FeaturePlaceholderView.swift */; };
+		A00100000000000000000009 /* BundledImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000009 /* BundledImage.swift */; };
+		A00100000000000000000010 /* KeepScreenAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000010 /* KeepScreenAwake.swift */; };
+		A00100000000000000000011 /* AmbientSlideshowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000011 /* AmbientSlideshowView.swift */; };
+		A00100000000000000000012 /* RecipeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000012 /* RecipeStore.swift */; };
+		A00100000000000000000013 /* RecipeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000013 /* RecipeLibraryView.swift */; };
+		A00100000000000000000014 /* RecipeImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000014 /* RecipeImporter.swift */; };
+		A00100000000000000000015 /* NewRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000015 /* NewRecipeView.swift */; };
+		A00100000000000000000016 /* ContinueRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000016 /* ContinueRecipeView.swift */; };
+		A00100000000000000000017 /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000017 /* FavoritesView.swift */; };
+		A00100000000000000000018 /* GroceryListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000018 /* GroceryListStore.swift */; };
+		A00100000000000000000019 /* GroceryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000019 /* GroceryListView.swift */; };
+		A00100000000000000000020 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000020 /* AuthService.swift */; };
+		A00100000000000000000021 /* AuthViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000021 /* AuthViews.swift */; };
+		A00100000000000000000022 /* SharingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000022 /* SharingService.swift */; };
+		A00100000000000000000023 /* ProfileSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100000000000000000023 /* ProfileSettingsView.swift */; };
+		A00300000000000000000001 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = P00200000000000000000001 /* FirebaseCore */; };
+		A00300000000000000000002 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = P00200000000000000000002 /* FirebaseAuth */; };
+		A00300000000000000000003 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = P00200000000000000000003 /* FirebaseFirestore */; };
+		A00300000000000000000004 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = P00200000000000000000004 /* FirebaseStorage */; };
+		A00300000000000000000005 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = P00200000000000000000005 /* GoogleSignIn */; };
+		A00200000000000000000018 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000018 /* GoogleService-Info.plist */; };
+		A00200000000000000000019 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000021 /* PrivacyInfo.xcprivacy */; };
+		A00200000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000001 /* Assets.xcassets */; };
+		A00200000000000000000002 /* buttery_wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000002 /* buttery_wordmark.png */; };
+		A00200000000000000000003 /* home_background.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000003 /* home_background.png */; };
+		A00200000000000000000004 /* ambient_extra_01.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000004 /* ambient_extra_01.png */; };
+		A00200000000000000000005 /* ambient_extra_02.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000005 /* ambient_extra_02.png */; };
+		A00200000000000000000006 /* ambient_extra_03.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000006 /* ambient_extra_03.png */; };
+		A00200000000000000000007 /* ambient_extra_04.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000007 /* ambient_extra_04.png */; };
+		A00200000000000000000008 /* ambient_extra_05.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000008 /* ambient_extra_05.png */; };
+		A00200000000000000000009 /* ambient_extra_06.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000009 /* ambient_extra_06.png */; };
+		A00200000000000000000010 /* ambient_bread.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000010 /* ambient_bread.png */; };
+		A00200000000000000000011 /* ambient_pancakes.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000011 /* ambient_pancakes.png */; };
+		A00200000000000000000012 /* ambient_salad.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000012 /* ambient_salad.png */; };
+		A00200000000000000000013 /* ambient_salmon.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000013 /* ambient_salmon.png */; };
+		A00200000000000000000014 /* ambient_extra_07.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000014 /* ambient_extra_07.png */; };
+		A00200000000000000000015 /* ambient_extra_08.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000015 /* ambient_extra_08.png */; };
+		A00200000000000000000016 /* ambient_extra_09.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000016 /* ambient_extra_09.png */; };
+		A00200000000000000000017 /* ambient_extra_10.png in Resources */ = {isa = PBXBuildFile; fileRef = B00200000000000000000017 /* ambient_extra_10.png */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B00000000000000000000001 /* Buttery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buttery.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00100000000000000000001 /* ButteryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButteryApp.swift; sourceTree = "<group>"; };
+		B00100000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		B00100000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B00100000000000000000004 /* ButteryTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButteryTheme.swift; sourceTree = "<group>"; };
+		B00100000000000000000005 /* Recipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recipe.swift; sourceTree = "<group>"; };
+		B00100000000000000000006 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
+		B00100000000000000000007 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		B00100000000000000000008 /* FeaturePlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturePlaceholderView.swift; sourceTree = "<group>"; };
+		B00100000000000000000009 /* BundledImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledImage.swift; sourceTree = "<group>"; };
+		B00100000000000000000010 /* KeepScreenAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepScreenAwake.swift; sourceTree = "<group>"; };
+		B00100000000000000000011 /* AmbientSlideshowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientSlideshowView.swift; sourceTree = "<group>"; };
+		B00100000000000000000012 /* RecipeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeStore.swift; sourceTree = "<group>"; };
+		B00100000000000000000013 /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
+		B00100000000000000000014 /* RecipeImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImporter.swift; sourceTree = "<group>"; };
+		B00100000000000000000015 /* NewRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewRecipeView.swift; sourceTree = "<group>"; };
+		B00100000000000000000016 /* ContinueRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueRecipeView.swift; sourceTree = "<group>"; };
+		B00100000000000000000017 /* FavoritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesView.swift; sourceTree = "<group>"; };
+		B00100000000000000000018 /* GroceryListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListStore.swift; sourceTree = "<group>"; };
+		B00100000000000000000019 /* GroceryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListView.swift; sourceTree = "<group>"; };
+		B00100000000000000000020 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		B00100000000000000000021 /* AuthViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViews.swift; sourceTree = "<group>"; };
+		B00100000000000000000022 /* SharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingService.swift; sourceTree = "<group>"; };
+		B00100000000000000000023 /* ProfileSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsView.swift; sourceTree = "<group>"; };
+		B00200000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B00200000000000000000002 /* buttery_wordmark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = buttery_wordmark.png; sourceTree = "<group>"; };
+		B00200000000000000000003 /* home_background.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = home_background.png; sourceTree = "<group>"; };
+		B00200000000000000000004 /* ambient_extra_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_01.png; sourceTree = "<group>"; };
+		B00200000000000000000005 /* ambient_extra_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_02.png; sourceTree = "<group>"; };
+		B00200000000000000000006 /* ambient_extra_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_03.png; sourceTree = "<group>"; };
+		B00200000000000000000007 /* ambient_extra_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_04.png; sourceTree = "<group>"; };
+		B00200000000000000000008 /* ambient_extra_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_05.png; sourceTree = "<group>"; };
+		B00200000000000000000009 /* ambient_extra_06.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_06.png; sourceTree = "<group>"; };
+		B00200000000000000000010 /* ambient_bread.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_bread.png; sourceTree = "<group>"; };
+		B00200000000000000000011 /* ambient_pancakes.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_pancakes.png; sourceTree = "<group>"; };
+		B00200000000000000000012 /* ambient_salad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_salad.png; sourceTree = "<group>"; };
+		B00200000000000000000013 /* ambient_salmon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_salmon.png; sourceTree = "<group>"; };
+		B00200000000000000000014 /* ambient_extra_07.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_07.png; sourceTree = "<group>"; };
+		B00200000000000000000015 /* ambient_extra_08.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_08.png; sourceTree = "<group>"; };
+		B00200000000000000000016 /* ambient_extra_09.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_09.png; sourceTree = "<group>"; };
+		B00200000000000000000017 /* ambient_extra_10.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ambient_extra_10.png; sourceTree = "<group>"; };
+		B00200000000000000000018 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		B00200000000000000000019 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B00200000000000000000020 /* Buttery.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Buttery.entitlements; sourceTree = "<group>"; };
+		B00200000000000000000021 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C00100000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A00300000000000000000001, A00300000000000000000002, A00300000000000000000003, A00300000000000000000004, A00300000000000000000005); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				D00100000000000000000001 /* Buttery */,
+				D00100000000000000000002 /* Shared */,
+				D00100000000000000000003 /* Features */,
+				D00100000000000000000004 /* Resources */,
+				D00100000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D00100000000000000000001 /* Buttery */ = {isa = PBXGroup; children = (B00100000000000000000001, B00100000000000000000002, B00100000000000000000003, B00200000000000000000018, B00200000000000000000019, B00200000000000000000020, B00200000000000000000021); path = Buttery; sourceTree = "<group>"; };
+		D00100000000000000000002 /* Shared */ = {isa = PBXGroup; children = (D00200000000000000000001, D00200000000000000000002, D00200000000000000000003); path = Shared; sourceTree = "<group>"; };
+		D00200000000000000000001 /* DesignSystem */ = {isa = PBXGroup; children = (B00100000000000000000004, B00100000000000000000009, B00100000000000000000010); path = DesignSystem; sourceTree = "<group>"; };
+		D00200000000000000000002 /* Models */ = {isa = PBXGroup; children = (B00100000000000000000005); path = Models; sourceTree = "<group>"; };
+		D00200000000000000000003 /* Data */ = {isa = PBXGroup; children = (B00100000000000000000012, B00100000000000000000014, B00100000000000000000018, B00100000000000000000020, B00100000000000000000022); path = Data; sourceTree = "<group>"; };
+		D00100000000000000000003 /* Features */ = {isa = PBXGroup; children = (D00300000000000000000001, D00300000000000000000002, D00300000000000000000003, D00300000000000000000004, D00300000000000000000005, D00300000000000000000006, D00300000000000000000007, D00300000000000000000008); path = Features; sourceTree = "<group>"; };
+		D00300000000000000000001 /* Intro */ = {isa = PBXGroup; children = (B00100000000000000000006); path = Intro; sourceTree = "<group>"; };
+		D00300000000000000000002 /* Home */ = {isa = PBXGroup; children = (B00100000000000000000007); path = Home; sourceTree = "<group>"; };
+		D00300000000000000000003 /* Placeholder */ = {isa = PBXGroup; children = (B00100000000000000000008); path = Placeholder; sourceTree = "<group>"; };
+		D00300000000000000000004 /* Ambient */ = {isa = PBXGroup; children = (B00100000000000000000011); path = Ambient; sourceTree = "<group>"; };
+		D00300000000000000000005 /* Recipes */ = {isa = PBXGroup; children = (B00100000000000000000013, B00100000000000000000015, B00100000000000000000016, B00100000000000000000017); path = Recipes; sourceTree = "<group>"; };
+		D00300000000000000000006 /* Grocery */ = {isa = PBXGroup; children = (B00100000000000000000019); path = Grocery; sourceTree = "<group>"; };
+		D00300000000000000000007 /* Auth */ = {isa = PBXGroup; children = (B00100000000000000000021); path = Auth; sourceTree = "<group>"; };
+		D00300000000000000000008 /* Profile */ = {isa = PBXGroup; children = (B00100000000000000000023); path = Profile; sourceTree = "<group>"; };
+		D00100000000000000000004 /* Resources */ = {isa = PBXGroup; children = (B00200000000000000000001, D00400000000000000000001); path = Resources; sourceTree = "<group>"; };
+		D00400000000000000000001 /* Images */ = {isa = PBXGroup; children = (B00200000000000000000002, B00200000000000000000003, B00200000000000000000004, B00200000000000000000005, B00200000000000000000006, B00200000000000000000007, B00200000000000000000008, B00200000000000000000009, B00200000000000000000010, B00200000000000000000011, B00200000000000000000012, B00200000000000000000013, B00200000000000000000014, B00200000000000000000015, B00200000000000000000016, B00200000000000000000017); path = Images; sourceTree = "<group>"; };
+		D00100000000000000000005 /* Products */ = {isa = PBXGroup; children = (B00000000000000000000001); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E00100000000000000000001 /* Buttery */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F00200000000000000000001;
+			buildPhases = (C00200000000000000000001, C00100000000000000000001, C00300000000000000000001);
+			buildRules = ();
+			dependencies = ();
+			name = Buttery;
+			packageProductDependencies = (
+				P00200000000000000000001 /* FirebaseCore */,
+				P00200000000000000000002 /* FirebaseAuth */,
+				P00200000000000000000003 /* FirebaseFirestore */,
+				P00200000000000000000004 /* FirebaseStorage */,
+				P00200000000000000000005 /* GoogleSignIn */,
+			);
+			productName = Buttery;
+			productReference = B00000000000000000000001;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2650; LastUpgradeCheck = 2650; TargetAttributes = {E00100000000000000000001 = {CreatedOnToolsVersion = 26.5;};};};
+			buildConfigurationList = F00100000000000000000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = D00000000000000000000001;
+			packageReferences = (
+				P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				P00100000000000000000002 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			productRefGroup = D00100000000000000000005;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (E00100000000000000000001);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C00300000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00200000000000000000001, A00200000000000000000002, A00200000000000000000003, A00200000000000000000004, A00200000000000000000005, A00200000000000000000006, A00200000000000000000007, A00200000000000000000008, A00200000000000000000009, A00200000000000000000010, A00200000000000000000011, A00200000000000000000012, A00200000000000000000013, A00200000000000000000014, A00200000000000000000015, A00200000000000000000016, A00200000000000000000017, A00200000000000000000018, A00200000000000000000019); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C00200000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00100000000000000000001, A00100000000000000000002, A00100000000000000000003, A00100000000000000000004, A00100000000000000000005, A00100000000000000000006, A00100000000000000000007, A00100000000000000000008, A00100000000000000000009, A00100000000000000000010, A00100000000000000000011, A00100000000000000000012, A00100000000000000000013, A00100000000000000000014, A00100000000000000000015, A00100000000000000000016, A00100000000000000000017, A00100000000000000000018, A00100000000000000000019, A00100000000000000000020, A00100000000000000000021, A00100000000000000000022, A00100000000000000000023); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.14.0;
+			};
+		};
+		P00100000000000000000002 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		P00200000000000000000001 /* FirebaseCore */ = {isa = XCSwiftPackageProductDependency; package = P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */; productName = FirebaseCore; };
+		P00200000000000000000002 /* FirebaseAuth */ = {isa = XCSwiftPackageProductDependency; package = P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */; productName = FirebaseAuth; };
+		P00200000000000000000003 /* FirebaseFirestore */ = {isa = XCSwiftPackageProductDependency; package = P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */; productName = FirebaseFirestore; };
+		P00200000000000000000004 /* FirebaseStorage */ = {isa = XCSwiftPackageProductDependency; package = P00100000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */; productName = FirebaseStorage; };
+		P00200000000000000000005 /* GoogleSignIn */ = {isa = XCSwiftPackageProductDependency; package = P00100000000000000000002 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */; productName = GoogleSignIn; };
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCBuildConfiguration section */
+		F01000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0;}; name = Debug; };
+		F01000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_VERSION = 5.0;}; name = Release; };
+		F02000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = Buttery/Buttery.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_ASSET_PATHS = ""; DEVELOPMENT_TEAM = YFAPUYVFKW; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Buttery/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.buttery.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;}; name = Debug; };
+		F02000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = Buttery/Buttery.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = YFAPUYVFKW; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Buttery/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.buttery.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;}; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F00100000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (F01000000000000000000001, F01000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F00200000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (F02000000000000000000001, F02000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = E00000000000000000000001;
+}
