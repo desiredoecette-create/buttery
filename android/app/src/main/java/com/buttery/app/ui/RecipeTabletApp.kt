@@ -263,19 +263,23 @@ fun RecipeTabletApp() {
                             screen = AppScreen.Login
                         },
                         onViewShare = { share ->
-                            accountRepository.markShare(
-                                share.shareId,
-                                if (share.status == AccountRepository.STATUS_PENDING) {
-                                    AccountRepository.STATUS_VIEWED
-                                } else {
-                                    share.status
-                                }
-                            )
+                            scope.launch {
+                                accountRepository.markShare(
+                                    share.shareId,
+                                    if (share.status == AccountRepository.STATUS_PENDING) {
+                                        AccountRepository.STATUS_VIEWED
+                                    } else {
+                                        share.status
+                                    }
+                                )
+                            }
                             screen = AppScreen.SharedRecipePreview(share)
                         },
                         onAddShare = { shareToAdd = it },
                         onDismissShare = {
-                            accountRepository.markShare(it.shareId, AccountRepository.STATUS_DISMISSED)
+                            scope.launch {
+                                accountRepository.markShare(it.shareId, AccountRepository.STATUS_DISMISSED)
+                            }
                         }
                     )
                 } ?: LoginScreen(
@@ -288,7 +292,7 @@ fun RecipeTabletApp() {
                 )
                 is AppScreen.SharedRecipePreview -> SharedRecipePreviewScreen(
                     share = current.share,
-                    senderProfile = accountRepository.findUser(current.share.fromUsername),
+                    senderProfile = null,
                     onBack = { screen = AppScreen.Profile },
                     onAdd = { shareToAdd = current.share }
                 )
@@ -472,6 +476,7 @@ fun RecipeTabletApp() {
                 ShareRecipeDialog(
                     recipe = recipe,
                     findUser = accountRepository::findUser,
+                    matchingUsernames = accountRepository::matchingUsernames,
                     onShare = { recipient -> accountRepository.shareRecipe(recipe, recipient) },
                     onDismiss = { recipeToShare = null }
                 )
@@ -481,30 +486,32 @@ fun RecipeTabletApp() {
                     albums = albums,
                     onChoose = { albumId ->
                         scope.launch {
-                            val snapshot = share.recipe
-                            repository.saveRecipe(
-                                recipe = ParsedRecipe(
-                                    title = snapshot.title,
-                                    ingredients = snapshot.ingredients,
-                                    instructions = snapshot.instructions,
-                                    prepTime = snapshot.prepTime,
-                                    cookTime = snapshot.cookTime,
-                                    totalTime = snapshot.totalTime,
-                                    servings = snapshot.servings,
-                                    notes = snapshot.notes,
-                                    imageUrl = snapshot.imageUrl,
-                                    sourceUrl = snapshot.sourceUrl,
-                                    originalRawText = snapshot.originalRawText
-                                ),
-                                albumId = albumId,
-                                photoUri = snapshot.photoUri,
-                                videoUri = snapshot.videoUri,
-                                photoUris = snapshot.photoUris
-                            )
-                            accountRepository.markShare(
-                                share.shareId,
-                                AccountRepository.STATUS_ADDED
-                            )
+                            runCatching {
+                                val snapshot = share.recipe
+                                repository.saveRecipe(
+                                    recipe = ParsedRecipe(
+                                        title = snapshot.title,
+                                        ingredients = snapshot.ingredients,
+                                        instructions = snapshot.instructions,
+                                        prepTime = snapshot.prepTime,
+                                        cookTime = snapshot.cookTime,
+                                        totalTime = snapshot.totalTime,
+                                        servings = snapshot.servings,
+                                        notes = snapshot.notes,
+                                        imageUrl = snapshot.imageUrl,
+                                        sourceUrl = snapshot.sourceUrl,
+                                        originalRawText = snapshot.originalRawText
+                                    ),
+                                    albumId = albumId,
+                                    photoUri = snapshot.photoUri,
+                                    videoUri = snapshot.videoUri,
+                                    photoUris = snapshot.photoUris
+                                )
+                                accountRepository.markShare(
+                                    share.shareId,
+                                    AccountRepository.STATUS_ADDED
+                                )
+                            }
                             shareToAdd = null
                             screen = AppScreen.Profile
                         }

@@ -1,9 +1,9 @@
 package com.buttery.app.ui.screens
 
 import android.net.Uri
-import android.widget.ImageView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -49,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +73,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
 import com.buttery.app.R
 import com.buttery.app.data.AccountResult
 import com.buttery.app.data.RecipeShare
@@ -78,6 +81,7 @@ import com.buttery.app.data.SharedRecipeSnapshot
 import com.buttery.app.data.UserProfile
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -91,10 +95,10 @@ private enum class AuthMode { WELCOME, SIGN_UP, SIGN_IN }
 
 @Composable
 fun LoginScreen(
-    onSignUp: (String, String, String, String) -> AccountResult,
-    onSignIn: (String, String) -> AccountResult,
+    onSignUp: suspend (String, String, String, String) -> AccountResult,
+    onSignIn: suspend (String, String) -> AccountResult,
     onGoogleSignIn: suspend () -> AccountResult,
-    onCompleteGoogleSignUp: (String, String, String, String) -> AccountResult
+    onCompleteGoogleSignUp: suspend (String, String, String, String) -> AccountResult
 ) {
     var mode by remember { mutableStateOf(AuthMode.WELCOME) }
     var username by remember { mutableStateOf("") }
@@ -103,6 +107,7 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var providerSignInRunning by remember { mutableStateOf(false) }
+    var emailSignInRunning by remember { mutableStateOf(false) }
     var pendingGoogleAccount by remember {
         mutableStateOf<AccountResult.UsernameRequired?>(null)
     }
@@ -203,13 +208,21 @@ fun LoginScreen(
                         )
                         Button(
                             onClick = {
-                                val result = if (mode == AuthMode.SIGN_UP) {
-                                    onSignUp(username, email, password, displayName)
-                                } else {
-                                    onSignIn(email, password)
+                                if (!emailSignInRunning) {
+                                    emailSignInRunning = true
+                                    message = null
+                                    scope.launch {
+                                        val result = if (mode == AuthMode.SIGN_UP) {
+                                            onSignUp(username, email, password, displayName)
+                                        } else {
+                                            onSignIn(email, password)
+                                        }
+                                        message = (result as? AccountResult.Error)?.message
+                                        emailSignInRunning = false
+                                    }
                                 }
-                                message = (result as? AccountResult.Error)?.message
                             },
+                            enabled = !emailSignInRunning,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -231,17 +244,26 @@ fun LoginScreen(
                         AccountField(username, { username = it }, "Username")
                         Button(
                             onClick = {
-                                val result = onCompleteGoogleSignUp(
-                                    pending.userId,
-                                    pending.email,
-                                    pending.displayName,
-                                    username
-                                )
-                                message = when (result) {
-                                    is AccountResult.Error -> result.message
-                                    else -> null
+                                if (!providerSignInRunning) {
+                                    providerSignInRunning = true
+                                    message = null
+                                    scope.launch {
+                                        val result = onCompleteGoogleSignUp(
+                                            pending.userId,
+                                            pending.email,
+                                            pending.displayName,
+                                            username
+                                        )
+                                        message = when (result) {
+                                            is AccountResult.Error -> result.message
+                                            else -> null
+                                        }
+                                        if (result is AccountResult.Success) pendingGoogleAccount = null
+                                        providerSignInRunning = false
+                                    }
                                 }
                             },
+                            enabled = !providerSignInRunning,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -281,7 +303,7 @@ fun ProfileScreen(
     profile: UserProfile,
     inbox: List<RecipeShare>,
     onBack: () -> Unit,
-    onSaveProfile: (String, String?) -> AccountResult,
+    onSaveProfile: suspend (String, String?) -> AccountResult,
     onSignOut: () -> Unit,
     onViewShare: (RecipeShare) -> Unit,
     onAddShare: (RecipeShare) -> Unit,
@@ -292,7 +314,9 @@ fun ProfileScreen(
         mutableStateOf(profile.profilePhotoUri)
     }
     var message by remember { mutableStateOf<String?>(null) }
+    var savingProfile by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             photoUri = runCatching {
@@ -351,7 +375,10 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         ProfileAvatar(photoUri, 112)
-                        OutlinedButton(onClick = { picker.launch("image/*") }) {
+                        OutlinedButton(
+                            onClick = { picker.launch("image/*") },
+                            enabled = !savingProfile
+                        ) {
                             Icon(Icons.Rounded.Image, null)
                             Text("  Change photo")
                         }
@@ -375,15 +402,34 @@ fun ProfileScreen(
                         )
                         Button(
                             onClick = {
-                                message = when (val result = onSaveProfile(displayName, photoUri)) {
-                                    is AccountResult.Success -> "Profile saved."
-                                    is AccountResult.UsernameRequired -> "Choose a username to continue."
-                                    is AccountResult.Error -> result.message
+                                if (!savingProfile) {
+                                    savingProfile = true
+                                    message = null
+                                    scope.launch {
+                                        message = when (val result = onSaveProfile(displayName, photoUri)) {
+                                            is AccountResult.Success -> "Profile saved."
+                                            is AccountResult.UsernameRequired -> "Choose a username to continue."
+                                            is AccountResult.Error -> result.message
+                                        }
+                                        savingProfile = false
+                                    }
                                 }
                             },
+                            enabled = !savingProfile,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
-                        ) { Text("Save profile", color = AccountNavy) }
+                        ) {
+                            if (savingProfile) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = AccountNavy
+                                )
+                                Text("  Saving…", color = AccountNavy)
+                            } else {
+                                Text("Save profile", color = AccountNavy)
+                            }
+                        }
                         message?.let { Text(it, color = AccountInk) }
                         Text(
                             "Settings and account preferences will live here.",
@@ -464,8 +510,17 @@ private fun InboxCard(
             Button(
                 onClick = { onAdd(share) },
                 enabled = share.status != "added",
-                colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
-            ) { Text("Add to My Recipes", color = AccountNavy) }
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccountButter,
+                    disabledContainerColor = Color(0xFFB7B2A8),
+                    disabledContentColor = Color(0xFFEFECE3)
+                )
+            ) {
+                Text(
+                    if (share.status == "added") "Added" else "Add to My Recipes",
+                    color = if (share.status == "added") Color(0xFFEFECE3) else AccountNavy
+                )
+            }
             IconButton(onClick = { onDismiss(share) }) {
                 Icon(Icons.Rounded.Close, "Dismiss")
             }
@@ -475,59 +530,62 @@ private fun InboxCard(
 
 @Composable
 fun ProfileAvatar(photoUri: String?, sizeDp: Int) {
-    if (photoUri == null) {
-        Surface(
-            modifier = Modifier.size(sizeDp.dp),
-            shape = CircleShape,
-            color = AccountButter
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Rounded.Person,
-                    contentDescription = "Profile",
-                    tint = AccountNavy,
-                    modifier = Modifier.size((sizeDp * 0.58f).dp)
-                )
-            }
+    Box(
+        modifier = Modifier
+            .size(sizeDp.dp)
+            .clip(CircleShape)
+            .background(AccountButter),
+        contentAlignment = Alignment.Center
+    ) {
+        if (photoUri.isNullOrBlank()) {
+            Icon(
+                Icons.Rounded.Person,
+                contentDescription = "Profile",
+                tint = AccountNavy,
+                modifier = Modifier.size((sizeDp * 0.58f).dp)
+            )
+        } else {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = "Profile",
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.ic_default_profile),
+                error = painterResource(R.drawable.ic_default_profile),
+                modifier = Modifier.fillMaxSize()
+            )
         }
-    } else {
-        AndroidView(
-            factory = { context ->
-                ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    loadProfileAvatar(photoUri)
-                }
-            },
-            update = { it.loadProfileAvatar(photoUri) },
-            modifier = Modifier.size(sizeDp.dp).clip(CircleShape)
-        )
-    }
-}
-
-private fun ImageView.loadProfileAvatar(photoUri: String) {
-    runCatching {
-        clearColorFilter()
-        setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        scaleType = ImageView.ScaleType.CENTER_CROP
-        setImageURI(Uri.parse(photoUri))
-    }.onFailure {
-        setImageResource(R.drawable.ic_default_profile)
-        setBackgroundColor(0xFFFFC857.toInt())
-        scaleType = ImageView.ScaleType.CENTER_INSIDE
     }
 }
 
 @Composable
 fun ShareRecipeDialog(
     recipe: Recipe,
-    findUser: (String) -> UserProfile?,
-    onShare: (UserProfile) -> Result<Unit>,
+    findUser: suspend (String) -> UserProfile?,
+    matchingUsernames: suspend (String) -> List<String>,
+    onShare: suspend (UserProfile) -> Result<Unit>,
     onDismiss: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
+    var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var foundUser by remember { mutableStateOf<UserProfile?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var shared by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(username) {
+        val clean = username.trim()
+        foundUser = null
+        shared = false
+        if (clean.length < 2) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(220)
+        suggestions = runCatching { matchingUsernames(clean) }
+            .getOrDefault(emptyList())
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Share ${recipe.title}") },
@@ -535,15 +593,35 @@ fun ShareRecipeDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 AccountField(username, {
                     username = it
-                    foundUser = null
                     message = null
-                    shared = false
                 }, "Recipient username")
-                foundUser?.let {
-                    Row {
-                        Text("Share ${recipe.title} with ")
-                        Text(it.username, fontWeight = FontWeight.Bold)
-                        Text("?")
+                if (suggestions.isNotEmpty()) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            Text(
+                                "Matching users",
+                                color = AccountInk.copy(alpha = 0.62f),
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                            )
+                            suggestions.forEach { suggestion ->
+                                TextButton(
+                                    onClick = {
+                                        username = suggestion
+                                        suggestions = emptyList()
+                                        foundUser = null
+                                        message = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("@$suggestion", color = AccountInk)
+                                }
+                            }
+                        }
                     }
                 }
                 message?.let {
@@ -558,27 +636,40 @@ fun ShareRecipeDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val recipient = foundUser
-                    if (recipient == null) {
-                        foundUser = findUser(username)
-                        if (foundUser == null) message = "No user found with that username."
-                    } else {
-                        message = onShare(recipient).fold(
-                            onSuccess = {
-                                shared = true
-                                "Recipe shared with ${recipient.username}."
-                            },
-                            onFailure = { it.message ?: "Could not share recipe." }
-                        )
+                    if (!loading) {
+                        loading = true
+                        message = null
+                        scope.launch {
+                            try {
+                                val recipient = foundUser ?: findUser(username)
+                                suggestions = emptyList()
+                                if (recipient == null) {
+                                    message = "No user found with that username."
+                                } else {
+                                    foundUser = recipient
+                                    message = onShare(recipient).fold(
+                                        onSuccess = {
+                                            shared = true
+                                            "Recipe shared with ${recipient.username}"
+                                        },
+                                        onFailure = { it.message ?: "Could not share recipe." }
+                                    )
+                                }
+                            } catch (error: Throwable) {
+                                message = error.localizedMessage ?: "Could not share recipe."
+                            } finally {
+                                loading = false
+                            }
+                        }
                     }
                 },
-                enabled = !shared,
+                enabled = !shared && !loading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AccountButter,
                     disabledContainerColor = Color(0xFF9A9A9A),
                     disabledContentColor = Color(0xFFE6E6E6)
                 )
-            ) { Text(if (foundUser == null) "Find user" else "Share", color = AccountNavy) }
+            ) { Text(if (loading) "Sharing…" else "Share", color = AccountNavy) }
         }
     )
 }
@@ -604,11 +695,11 @@ fun SharedRecipePreviewScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                ProfileAvatar(senderProfile?.profilePhotoUri, 46)
+                ProfileAvatar(senderProfile?.profilePhotoUri ?: share.fromProfilePhotoUri, 46)
                 Column {
                     Text(
-                        senderProfile?.displayName?.ifBlank { share.fromUsername }
-                            ?: share.fromUsername,
+                        senderProfile?.displayName?.ifBlank { share.fromDisplayName }
+                            ?: share.fromDisplayName.ifBlank { share.fromUsername },
                         color = AccountCream,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 17.sp
@@ -621,9 +712,24 @@ fun SharedRecipePreviewScreen(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Button(onClick = onAdd, colors = ButtonDefaults.buttonColors(containerColor = AccountButter)) {
-                Icon(Icons.Rounded.Add, null, tint = AccountNavy)
-                Text("  Add to My Recipes", color = AccountNavy)
+            Button(
+                onClick = onAdd,
+                enabled = share.status != "added",
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccountButter,
+                    disabledContainerColor = Color(0xFFB7B2A8),
+                    disabledContentColor = Color(0xFFEFECE3)
+                )
+            ) {
+                Icon(
+                    Icons.Rounded.Add,
+                    null,
+                    tint = if (share.status == "added") Color(0xFFEFECE3) else AccountNavy
+                )
+                Text(
+                    if (share.status == "added") "  Added to My Recipes" else "  Add to My Recipes",
+                    color = if (share.status == "added") Color(0xFFEFECE3) else AccountNavy
+                )
             }
         }
         Surface(
@@ -660,11 +766,12 @@ private fun SharedPhotoGallery(photoUris: List<String>) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         photoUris.forEach { photoUri ->
-            AndroidView(
-                factory = { context ->
-                    ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-                },
-                update = { it.setImageURI(Uri.parse(photoUri)) },
+            AsyncImage(
+                model = photoUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.ambient_extra_02),
+                error = painterResource(R.drawable.ambient_extra_02),
                 modifier = Modifier.size(300.dp, 184.dp).clip(RoundedCornerShape(16.dp))
             )
         }

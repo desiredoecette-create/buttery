@@ -2,6 +2,7 @@ package com.buttery.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,7 +118,11 @@ fun RecipeHomeScreen(
                 Box(modifier = Modifier.size(62.dp)) {
                     IconButton(
                         onClick = onProfile,
-                        modifier = Modifier.size(58.dp).align(Alignment.Center)
+                        modifier = Modifier
+                            .size(58.dp)
+                            .align(Alignment.Center)
+                            .background(Color(0xFFF4EFE6), CircleShape)
+                            .border(2.dp, Color(0xFFFFC857), CircleShape)
                     ) {
                         ProfileAvatar(profilePhotoUri, 52)
                     }
