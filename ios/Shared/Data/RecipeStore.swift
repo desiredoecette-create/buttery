@@ -119,6 +119,7 @@ final class RecipeStore {
     }
 
     func saveRecipe(_ draft: RecipeDraft, id: String? = nil) -> String {
+        let draft = sanitizedDraft(draft)
         let now = Date.now.millisecondsSince1970
         if let id, let index = recipes.firstIndex(where: { $0.id == id }) {
             recipes[index].title = String(draft.title.trimmed.prefix(60))
@@ -134,6 +135,9 @@ final class RecipeStore {
             recipes[index].albumId = draft.albumId
             recipes[index].sourceUrl = draft.sourceUrl
             recipes[index].originalRawText = draft.originalRawText
+            recipes[index].visibility = draft.visibility
+            recipes[index].originalCreatorId = draft.originalCreatorId
+            recipes[index].originalCreatorUsername = draft.originalCreatorUsername
             recipes[index].updatedAt = now
             persist()
             return id
@@ -159,7 +163,11 @@ final class RecipeStore {
                 albumId: draft.albumId,
                 isFavorite: false,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                visibility: draft.visibility,
+                likeCount: 0,
+                originalCreatorId: draft.originalCreatorId,
+                originalCreatorUsername: draft.originalCreatorUsername
             ),
             at: 0
         )
@@ -177,6 +185,29 @@ final class RecipeStore {
         recipes[index].isFavorite.toggle()
         recipes[index].updatedAt = Date.now.millisecondsSince1970
         persist()
+    }
+
+    func updateVisibility(id: String, visibility: RecipeVisibility) {
+        guard let index = recipes.firstIndex(where: { $0.id == id }) else { return }
+        recipes[index].visibility = visibility
+        recipes[index].updatedAt = Date.now.millisecondsSince1970
+        if visibility == .public, recipes[index].publicPublishedAt == nil {
+            recipes[index].publicPublishedAt = Date.now.millisecondsSince1970
+        }
+        persist()
+    }
+
+    func savePublicCopy(
+        _ recipe: Recipe,
+        albumId: String?,
+        creatorUsername: String?
+    ) -> String {
+        var draft = RecipeDraft(recipe: recipe)
+        draft.albumId = albumId
+        draft.visibility = .private
+        draft.originalCreatorId = recipe.ownerId
+        draft.originalCreatorUsername = creatorUsername ?? recipe.ownerUsername
+        return saveRecipe(draft)
     }
 
     func addSharedRecipe(_ shared: SharedRecipeSnapshot) -> String {
@@ -222,6 +253,7 @@ final class RecipeStore {
             var recipe = stored
             recipe.photoUrls = stored.photoUrls.map(resolveMediaURL)
             recipe.videoUrl = stored.videoUrl.map(resolveMediaURL)
+            sanitizeRecipe(&recipe)
             return recipe
         }
         albums = state.albums.map { stored in
@@ -247,6 +279,24 @@ final class RecipeStore {
         else { return }
         try? data.write(to: fileURL, options: .atomic)
     }
+
+    private func sanitizedDraft(_ draft: RecipeDraft) -> RecipeDraft {
+        var clean = draft
+        clean.title = RecipeImporter.cleanImportedRecipeField(clean.title)
+        clean.notes = RecipeImporter.cleanImportedRecipeField(clean.notes)
+        clean.ingredients = RecipeImporter.cleanImportedRecipeField(clean.ingredients)
+        clean.instructions = RecipeImporter.cleanImportedRecipeField(clean.instructions)
+        clean.originalRawText = RecipeImporter.cleanImportedRecipeField(clean.originalRawText)
+        return clean
+    }
+
+    private func sanitizeRecipe(_ recipe: inout Recipe) {
+        recipe.title = RecipeImporter.cleanImportedRecipeField(recipe.title)
+        recipe.notes = RecipeImporter.cleanImportedRecipeField(recipe.notes)
+        recipe.ingredients = RecipeImporter.cleanImportedRecipeField(recipe.ingredients)
+        recipe.instructions = RecipeImporter.cleanImportedRecipeField(recipe.instructions)
+        recipe.originalRawText = RecipeImporter.cleanImportedRecipeField(recipe.originalRawText)
+    }
 }
 
 struct RecipeDraft {
@@ -263,6 +313,9 @@ struct RecipeDraft {
     var albumId: String?
     var sourceUrl: URL?
     var originalRawText = ""
+    var visibility: RecipeVisibility? = .private
+    var originalCreatorId: String?
+    var originalCreatorUsername: String?
 
     init() {}
 
@@ -280,6 +333,9 @@ struct RecipeDraft {
         albumId = recipe.albumId
         sourceUrl = recipe.sourceUrl
         originalRawText = recipe.originalRawText
+        visibility = recipe.visibility ?? .private
+        originalCreatorId = recipe.originalCreatorId
+        originalCreatorUsername = recipe.originalCreatorUsername
     }
 }
 

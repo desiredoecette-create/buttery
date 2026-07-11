@@ -30,7 +30,7 @@ struct NewRecipeView: View {
 
                 ChoiceCard(
                     title: "Import Recipe",
-                    subtitle: "Use a recipe URL or a picture of a recipe.",
+                    subtitle: "Use a recipe URL, picture, or pasted recipe text.",
                     symbol: "square.and.arrow.down"
                 ) { showImport = true }
             }
@@ -94,6 +94,7 @@ private struct ImportRecipeView: View {
     let onSaved: (String) -> Void
     @State private var mode: ImportMode = .url
     @State private var url = ""
+    @State private var pastedRecipeText = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var importedDraft = RecipeDraft()
     @State private var showReview = false
@@ -145,6 +146,29 @@ private struct ImportRecipeView: View {
                                 Text("Buttery uses on-device text recognition, then lets you review every field.")
                                     .font(.footnote)
                                     .foregroundStyle(ButteryTheme.charcoal.opacity(0.65))
+                            }
+                            .importCard()
+                        case .text:
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text("Recipe Text").font(.system(size: 23, design: .serif))
+                                Text("Paste the recipe from a website, note, email, or message. Buttery will pull out the title, timing, servings, ingredients, and instructions for you to review.")
+                                    .font(.footnote)
+                                    .foregroundStyle(ButteryTheme.charcoal.opacity(0.65))
+                                TextEditor(text: $pastedRecipeText)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(minHeight: 190)
+                                    .padding(10)
+                                    .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(ButteryTheme.paprika.opacity(0.18))
+                                    )
+                                Button("Import from Text") {
+                                    runImport { try await RecipeImporter.importText(pastedRecipeText) }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ButteryTheme.herb)
+                                .disabled(pastedRecipeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isWorking)
                             }
                             .importCard()
                         }
@@ -213,12 +237,12 @@ private extension View {
 }
 
 private enum ImportMode: String, CaseIterable, Identifiable {
-    case url, photo
+    case url, photo, text
     var id: String { rawValue }
     var title: String {
-        switch self { case .url: "URL"; case .photo: "Photo" }
+        switch self { case .url: "URL"; case .photo: "Photo"; case .text: "Text" }
     }
     var symbol: String {
-        switch self { case .url: "link"; case .photo: "camera" }
+        switch self { case .url: "link"; case .photo: "camera"; case .text: "text.alignleft" }
     }
 }

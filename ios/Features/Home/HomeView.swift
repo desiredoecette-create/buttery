@@ -23,8 +23,8 @@ struct HomeView: View {
 
     private var tiles: [HomeTile] {
         [
-            .init(.recipes, image: tileImage(at: 0), symbol: "magnifyingglass"),
-            .init(.newRecipe, image: tileImage(at: 1), symbol: "plus"),
+            .init(.recipes, image: tileImage(at: 0), symbol: "magnifyingglass", title: "My Recipes"),
+            .init(.explore, image: tileImage(at: 5), symbol: "globe.americas.fill", title: "Explore Recipes"),
             .init(
                 .continueRecipe,
                 image: tileImage(at: 2),
@@ -36,7 +36,7 @@ struct HomeView: View {
             ),
             .init(.favorites, image: tileImage(at: 3), symbol: "heart"),
             .init(.grocery, image: tileImage(at: 4), symbol: "cart"),
-            .init(.settings, image: tileImage(at: 5), symbol: "gearshape")
+            .init(.newRecipe, image: tileImage(at: 1), symbol: "plus")
         ]
     }
 
@@ -128,7 +128,9 @@ struct HomeView: View {
             Menu {
                 if !appState.isGuest {
                     if let profile = authService.profile {
-                        Text("@\(profile.username)")
+                        Button("@\(profile.username)", systemImage: "person.crop.circle.fill") {
+                            appState.path.append(.myProfile)
+                        }
                     }
                     Button("Inbox", systemImage: sharingService.hasUnread ? "tray.full.fill" : "tray.full") {
                         appState.path.append(.inbox)
@@ -163,12 +165,8 @@ struct HomeView: View {
     private var dashboardAvatar: some View {
         if let value = authService.profile?.profilePhotoUrl,
            let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill()
-                } else {
-                    genericDashboardAvatar
-                }
+            ButteryRemoteImage(url: url, maxPixelDimension: 220) {
+                genericDashboardAvatar
             }
             .frame(width: 40, height: 40)
             .clipShape(Circle())
@@ -260,9 +258,7 @@ private struct HomeTileView: View {
             GeometryReader { geometry in
                 ZStack {
                     if let photo = tile.photo {
-                        AsyncImage(url: photo) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
+                        ButteryRemoteImage(url: photo, maxPixelDimension: 650) {
                             BundledImage(name: tile.image)
                         }
                         .frame(width: geometry.size.width, height: geometry.size.height)

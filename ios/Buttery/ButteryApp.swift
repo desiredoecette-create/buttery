@@ -9,6 +9,7 @@ struct ButteryApp: App {
     @State private var groceryListStore = GroceryListStore()
     @State private var authService = AuthService()
     @State private var sharingService = SharingService()
+    @State private var socialProfileService = SocialProfileService()
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct ButteryApp: App {
                 .environment(groceryListStore)
                 .environment(authService)
                 .environment(sharingService)
+                .environment(socialProfileService)
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)

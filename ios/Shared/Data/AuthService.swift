@@ -204,7 +204,8 @@ final class AuthService {
 
     func updateProfilePhoto(data: Data) async throws {
         guard let user = currentUser else { throw AuthServiceError.sessionExpired }
-        guard data.count < 5 * 1_024 * 1_024 else {
+        let uploadData = try preparedProfilePhotoData(from: data)
+        guard uploadData.count < 5 * 1_024 * 1_024 else {
             throw AuthServiceError.other("Profile picture must be smaller than 5 MB.")
         }
         let reference = Storage.storage().reference()
@@ -212,7 +213,7 @@ final class AuthService {
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
         do {
-            _ = try await reference.putDataAsync(data, metadata: metadata)
+            _ = try await reference.putDataAsync(uploadData, metadata: metadata)
             let url = try await reference.downloadURL()
             try await database?.collection("users").document(user.uid).updateData([
                 "profilePhotoUrl": url.absoluteString,
@@ -228,10 +229,36 @@ final class AuthService {
                     profilePhotoUrl: url.absoluteString,
                     provider: existing.provider
                 )
+                try? await database?.collection("publicProfiles").document(existing.uid).setData([
+                    "uid": existing.uid,
+                    "username": existing.username,
+                    "displayName": existing.displayName,
+                    "profilePhotoUrl": url.absoluteString,
+                    "updatedAt": FieldValue.serverTimestamp(),
+                    "schemaVersion": 1
+                ], merge: true)
             }
         } catch {
             throw friendly(error)
         }
+    }
+
+    private func preparedProfilePhotoData(from data: Data) throws -> Data {
+        guard let image = UIImage(data: data) else {
+            throw AuthServiceError.other("That picture could not be opened. Please choose another.")
+        }
+        let maxSide: CGFloat = 900
+        let longestSide = max(image.size.width, image.size.height)
+        let scale = longestSide > maxSide ? maxSide / longestSide : 1
+        let targetSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        guard let jpeg = resized.jpegData(compressionQuality: 0.78) else {
+            throw AuthServiceError.other("That picture could not be prepared for upload.")
+        }
+        return jpeg
     }
 
     func deleteAccount() async throws {

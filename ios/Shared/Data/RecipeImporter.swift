@@ -55,24 +55,58 @@ enum RecipeImporter {
         return draft
     }
 
+    static func importText(_ raw: String) async throws -> RecipeDraft {
+        let normalized = normalizePastedRecipeText(raw)
+        guard normalized.count >= 20 else { throw ImportError.noRecipe }
+        let draft = parseText(normalized)
+        guard isUsableImportedDraft(draft)
+        else { throw ImportError.noRecipe }
+        return draft
+    }
+
+    static func cleanImportedRecipeField(_ value: String) -> String {
+        value
+            .replacingOccurrences(
+                of: #"(?im)^\s*(absolutely|sure|of course|certainly|yes)[!.]?\s*(here(?:'|’)s|here is|below is|i(?:'|’)ve got|let(?:'|’)s make|this is)\b.*$"#,
+                with: "",
+                options: .regularExpression
+            )
+            .replacingOccurrences(
+                of: #"(?im)^\s*(here(?:'|’)s|here is|below is)\s+(?:the|a|an)\s+.*\b(recipe|version)\b.*$"#,
+                with: "",
+                options: .regularExpression
+            )
+            .replacingOccurrences(
+                of: #"(?im)^\s*(i think you(?:'|’)re.*|hope you enjoy.*|let me know if.*|want me to.*|i can also.*)\s*$"#,
+                with: "",
+                options: .regularExpression
+            )
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && !isAssistantPreamble($0) && !isAssistantClosing($0) }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static func parseText(_ raw: String) -> RecipeDraft {
         let lines = raw.replacingOccurrences(of: "\r", with: "")
             .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap(splitDenseRecipeLine)
+            .map(cleanMarkdownLine)
             .filter { !$0.isEmpty && !isClutter($0) }
         var draft = RecipeDraft()
         guard !lines.isEmpty else { return draft }
         draft.title = lines.first(where: isProbableTitle) ?? lines.first ?? ""
+        applyEmbeddedMetadata(in: raw, to: &draft)
         var section = Section.unknown
         var ingredients: [String] = [], instructions: [String] = [], notes: [String] = []
 
         for line in lines where line != draft.title {
-            let lower = line.lowercased().trimmingCharacters(in: .punctuationCharacters)
-            if ["ingredient", "ingredients"].contains(lower) { section = .ingredients; continue }
-            if ["direction", "directions", "instruction", "instructions", "method", "steps"].contains(lower) {
+            if isIngredientHeading(line) { section = .ingredients; continue }
+            if isInstructionHeading(line) {
                 section = .instructions; continue
             }
-            if ["note", "notes", "tip", "tips", "recipe notes"].contains(lower) {
+            if isNotesHeading(line) || isDescriptionHeading(line) {
                 section = .notes; continue
             }
             if let metadata = metadata(line) {
@@ -104,7 +138,89 @@ enum RecipeImporter {
         draft.instructions = instructions.joined(separator: "\n")
         draft.notes = String(notes.joined(separator: "\n").prefix(1_500))
         draft.originalRawText = raw
+        recoverLikelySections(from: lines, into: &draft)
+        draft.instructions = numberedInstructionText(draft.instructions)
         return draft
+    }
+
+    private static func normalizePastedRecipeText(_ raw: String) -> String {
+        let decoded = cleanImportedRecipeField(decodeForPastedText(raw))
+            .replacingOccurrences(of: "\u{00a0}", with: " ")
+            .replacingOccurrences(of: #"\r\n?"#, with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+        let lines = decoded.components(separatedBy: .newlines)
+            .flatMap(splitDenseRecipeLine)
+            .map(cleanMarkdownLine)
+            .filter { !$0.isEmpty && $0.count <= 700 && !isWebClutter($0) && !isPasteClutter($0) }
+        var unique: [String] = []
+        for line in lines where !unique.contains(line) {
+            unique.append(line)
+        }
+        return unique.joined(separator: "\n")
+    }
+
+    private static func decodeForPastedText(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.range(of: #"<[A-Za-z][^>]*>"#, options: .regularExpression) != nil {
+            return cleanHTML(trimmed)
+        }
+        return trimmed
+    }
+
+    private static func splitDenseRecipeLine(_ line: String) -> [String] {
+        guard line.count > 90 else { return [line] }
+        let sectioned = line
+            .replacingOccurrences(of: #"(?i)(?:^|\s)(#{0,6}\s*\*{0,2}(?:Recipe\s+)?(?:Title|Description|Ingredients?|Instructions?|Directions?|Method|Steps?|Notes?|Tips?)\*{0,2}\s*:?)"#, with: "\n$1\n", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+(\d+[.)]\s+)(?=[A-Z])"#, with: "\n$1", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+([•*-]\s+)(?=[A-Za-z0-9])"#, with: "\n$1", options: .regularExpression)
+        return sectioned.components(separatedBy: .newlines)
+    }
+
+    private static func recoverLikelySections(from lines: [String], into draft: inout RecipeDraft) {
+        guard draft.ingredients.isEmpty || draft.instructions.isEmpty else { return }
+        guard let ingredientStart = lines.firstIndex(where: isIngredientHeading) else { return }
+        let instructionStart = lines.firstIndex(where: isInstructionHeading)
+        let notesStart = lines.firstIndex(where: { isNotesHeading($0) || isDescriptionHeading($0) })
+        if draft.ingredients.isEmpty {
+            let ingredientEnd = [instructionStart, notesStart].compactMap { $0 }.filter { $0 > ingredientStart }.min() ?? lines.count
+            draft.ingredients = Array(lines[(ingredientStart + 1)..<ingredientEnd])
+                .map(cleanListMarker)
+                .filter { !$0.isEmpty && metadata($0) == nil }
+                .joined(separator: "\n")
+        }
+        if draft.instructions.isEmpty, let instructionStart {
+            let instructionEnd = [notesStart].compactMap { $0 }.filter { $0 > instructionStart }.min() ?? lines.count
+            draft.instructions = Array(lines[(instructionStart + 1)..<instructionEnd])
+                .map(cleanListMarker)
+                .filter { !$0.isEmpty && metadata($0) == nil }
+                .joined(separator: "\n")
+        }
+    }
+
+    private static func numberedInstructionText(_ value: String) -> String {
+        let steps = value
+            .replacingOccurrences(of: "\r", with: "")
+            .components(separatedBy: .newlines)
+            .flatMap(splitDenseInstructionLine)
+            .map(cleanMarkdownLine)
+            .map(cleanListMarker)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && !isInstructionHeading($0) }
+
+        return steps.enumerated()
+            .map { "\($0.offset + 1). \($0.element)" }
+            .joined(separator: "\n\n")
+    }
+
+    private static func splitDenseInstructionLine(_ line: String) -> [String] {
+        guard line.count > 120 else { return [line] }
+        return line
+            .replacingOccurrences(
+                of: #"\s+((?:step\s*)?\d+[.):]\s+)(?=[A-Z])"#,
+                with: "\n$1",
+                options: [.regularExpression, .caseInsensitive]
+            )
+            .components(separatedBy: .newlines)
     }
 
     private static func structuredRecipe(in html: String) -> RecipeDraft? {
@@ -126,8 +242,12 @@ enum RecipeImporter {
             draft.totalTime = formatDuration(string(recipe["totalTime"]))
             draft.servings = yieldString(recipe["recipeYield"])
             draft.ingredients = stringArray(recipe["recipeIngredient"]).map(cleanText).filter { !$0.isEmpty }.joined(separator: "\n")
-            draft.instructions = instructionStrings(recipe["recipeInstructions"]).map(cleanText)
-                .filter { !$0.isEmpty }.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+            draft.instructions = numberedInstructionText(
+                instructionStrings(recipe["recipeInstructions"])
+                    .map(cleanText)
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "\n")
+            )
             if !draft.title.isEmpty { return draft }
         }
         return nil
@@ -200,6 +320,15 @@ enum RecipeImporter {
         cleanHTML(value).replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    private static func cleanMarkdownLine(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: #"^\s*#{1,6}\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\s*>+\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\s*[*_]{1,3}(.+?)[*_]{1,3}\s*$"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"[*_]{2,}"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\s*(Recipe\s+Title|Title)\s*:?\s*"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     private static func capture(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
@@ -227,6 +356,20 @@ enum RecipeImporter {
         let key = rawKey.hasPrefix("prep") ? "prep" : rawKey.hasPrefix("cook") ? "cook" : rawKey.hasPrefix("total") ? "total" : "servings"
         return (key, String(line[valueRange]).trimmingCharacters(in: .whitespaces))
     }
+    private static func applyEmbeddedMetadata(in text: String, to draft: inout RecipeDraft) {
+        if draft.prepTime.isEmpty, let value = capture(#"\bprep(?:\s*time)?\s*:?\s*([^\n|•,]{1,40})"#, in: text) {
+            draft.prepTime = cleanText(value)
+        }
+        if draft.cookTime.isEmpty, let value = capture(#"\bcook(?:\s*time)?\s*:?\s*([^\n|•,]{1,40})"#, in: text) {
+            draft.cookTime = cleanText(value)
+        }
+        if draft.totalTime.isEmpty, let value = capture(#"\btotal(?:\s*time)?\s*:?\s*([^\n|•,]{1,40})"#, in: text) {
+            draft.totalTime = cleanText(value)
+        }
+        if draft.servings.isEmpty, let value = capture(#"\b(?:servings?|serves|yield)\s*:?\s*([^\n|•,]{1,40})"#, in: text) {
+            draft.servings = cleanText(value)
+        }
+    }
     private static func formatDuration(_ value: String) -> String {
         guard value.uppercased().hasPrefix("P"),
               let regex = try? NSRegularExpression(pattern: #"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?"#, options: .caseInsensitive),
@@ -241,14 +384,56 @@ enum RecipeImporter {
     private static func cleanListMarker(_ line: String) -> String {
         line.replacingOccurrences(of: #"^\s*((step\s*)?\d+[.):]|[-*•])\s*"#, with: "", options: [.regularExpression, .caseInsensitive])
     }
-    private static func isProbableTitle(_ line: String) -> Bool {
-        line.count >= 2 && line.count <= 90 && !isIngredientHeading(line) && !isInstructionHeading(line) && metadata(line) == nil
+    private static func isUsableImportedDraft(_ draft: RecipeDraft) -> Bool {
+        !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        (
+            !draft.ingredients.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !draft.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !draft.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
     }
-    private static func isIngredientHeading(_ line: String) -> Bool { line.range(of: #"^\s*ingredients?\s*:?\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil }
-    private static func isInstructionHeading(_ line: String) -> Bool { line.range(of: #"^\s*(instructions?|directions?|method|steps?)\s*:?\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil }
-    private static func isNotesHeading(_ line: String) -> Bool { line.range(of: #"^\s*(recipe\s+)?notes?\s*:?\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil }
+    private static func isProbableTitle(_ line: String) -> Bool {
+        line.count >= 2 &&
+        line.count <= 90 &&
+        !isIngredientHeading(line) &&
+        !isInstructionHeading(line) &&
+        !isNotesHeading(line) &&
+        !isDescriptionHeading(line) &&
+        metadata(line) == nil
+    }
+    private static func isIngredientHeading(_ line: String) -> Bool {
+        line.range(of: #"^\s*(?:[*_#>\s-]*)ingredients?\s*:?\s*(?:[*_]*)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    private static func isInstructionHeading(_ line: String) -> Bool {
+        line.range(of: #"^\s*(?:[*_#>\s-]*)(instructions?|directions?|method|steps?)\s*:?\s*(?:[*_]*)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    private static func isNotesHeading(_ line: String) -> Bool {
+        line.range(of: #"^\s*(?:[*_#>\s-]*)(recipe\s+)?(notes?|tips?)\s*:?\s*(?:[*_]*)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    private static func isDescriptionHeading(_ line: String) -> Bool {
+        line.range(of: #"^\s*(?:[*_#>\s-]*)(description|summary|short\s+description)\s*:?\s*(?:[*_]*)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
     private static func isClutter(_ line: String) -> Bool {
         line.range(of: #"^\s*(like|share|follow|comment|save this recipe|full recipe below|join my group)(\s+.*)?$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    private static func isPasteClutter(_ line: String) -> Bool {
+        line.range(of: #"\b(copied from|download our app|open in app|pin this|rate this recipe|table of contents|skip to content|all rights reserved|©|http[s]?://|www\.)\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    private static func isAssistantPreamble(_ line: String) -> Bool {
+        line.range(
+            of: #"^\s*(absolutely|sure|of course|certainly|yes)[!.]?\s*(here(?:'|’)s|here is|below is|i(?:'|’)ve got|let(?:'|’)s make|this is)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil ||
+        line.range(
+            of: #"^\s*(here(?:'|’)s|here is|below is)\s+(?:the|a|an)\s+.*\b(recipe|version)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+    private static func isAssistantClosing(_ line: String) -> Bool {
+        line.range(
+            of: #"^\s*(hope you enjoy|let me know if|want me to|i can also|would you like me to|enjoy!)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
     private static func isWebClutter(_ line: String) -> Bool {
         line.range(of: #"\b(jump to recipe|print recipe|newsletter|subscribe|sign up|advertisement|related posts?|comments?|leave a reply|share on|author bio|frequently asked questions?|privacy policy|cookie policy)\b"#, options: [.regularExpression, .caseInsensitive]) != nil
@@ -262,7 +447,7 @@ enum RecipeImporter {
             switch self {
             case .invalidImage: "That image could not be read."
             case .invalidURL: "Enter a valid recipe URL."
-            case .noRecipe: "This page could not be imported cleanly. Try a different recipe page or a clear recipe photo."
+            case .noRecipe: "This recipe could not be imported cleanly. Try a clearer URL, photo, or pasted recipe text."
             }
         }
     }

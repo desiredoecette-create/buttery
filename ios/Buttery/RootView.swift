@@ -76,12 +76,18 @@ struct RootView: View {
                             FavoritesView()
                         } else if destination == .grocery {
                             GroceryListView()
+                        } else if destination == .explore {
+                            ExploreView()
                         } else if destination == .settings {
                             ProfileSettingsView()
                         } else if destination == .inbox {
                             RecipeInboxView()
                         } else if destination == .privacySupport {
                             PrivacySupportView()
+                        } else if destination == .myProfile {
+                            ButteryProfileView(mode: .own)
+                        } else if case let .publicProfile(userId) = destination {
+                            ButteryProfileView(mode: .publicUser(userId: userId))
                         } else {
                             FeaturePlaceholderView(destination: destination)
                         }

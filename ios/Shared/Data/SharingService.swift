@@ -21,6 +21,7 @@ struct SharedRecipeSnapshot: Hashable {
 
 struct ButteryRecipeShare: Identifiable, Hashable {
     let id: String
+    let type: String
     let fromUserId: String
     let fromUsername: String
     let fromDisplayName: String
@@ -28,6 +29,7 @@ struct ButteryRecipeShare: Identifiable, Hashable {
     let toUserId: String
     let toUsername: String
     let recipe: SharedRecipeSnapshot
+    let notificationMessage: String?
     var status: String
     let createdAt: Date?
 }
@@ -49,6 +51,7 @@ final class SharingService {
         listener = nil
         listeningUserId = userId
         inbox = []
+        lastError = nil
         guard let userId else { return }
         isLoading = true
         listener = Firestore.firestore().collection("recipeShares")
@@ -61,11 +64,76 @@ final class SharingService {
                         self.lastError = error.localizedDescription
                         return
                     }
+                    self.lastError = nil
                     self.inbox = snapshot?.documents.compactMap(Self.decode)
                         .filter { $0.status != "dismissed" }
                         .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) } ?? []
                 }
             }
+    }
+
+    func sendSubscriptionNotification(from subscriber: ButteryUserProfile, to creator: ButteryPublicProfile) async {
+        guard subscriber.uid != creator.id else { return }
+        let reference = Firestore.firestore().collection("recipeShares")
+            .document()
+        let snapshot: [String: Any] = [
+            "title": "",
+            "notes": "",
+            "prepTime": "",
+            "cookTime": "",
+            "totalTime": "",
+            "servings": "",
+            "ingredients": "",
+            "instructions": "",
+            "photoUrls": [],
+            "videoUrl": NSNull(),
+            "sourceUrl": NSNull(),
+            "originalRawText": ""
+        ]
+        do {
+            try await reference.setData([
+                "shareId": reference.documentID,
+                "type": "subscriptionNotification",
+                "fromUserId": subscriber.uid,
+                "fromUsername": subscriber.username,
+                "fromDisplayName": subscriber.displayName,
+                "fromProfilePhotoUrl": subscriber.profilePhotoUrl ?? NSNull(),
+                "toUserId": creator.id,
+                "toUsername": creator.username,
+                "recipeSnapshot": snapshot,
+                "message": "@\(subscriber.username) subscribed to you.",
+                "status": "pending",
+                "createdAt": FieldValue.serverTimestamp(),
+                "updatedAt": FieldValue.serverTimestamp(),
+                "schemaVersion": 1
+            ])
+        } catch {
+            // Subscription notifications are helpful, but they should never break the
+            // inbox experience or show a scary permissions banner for the recipient.
+            lastError = nil
+        }
+    }
+
+    func markSubscriptionNotificationsViewed(for userId: String?) async {
+        guard let userId else { return }
+        do {
+            let snapshot = try await Firestore.firestore().collection("recipeShares")
+                .whereField("toUserId", isEqualTo: userId)
+                .getDocuments()
+            for document in snapshot.documents {
+                let data = document.data()
+                guard data["type"] as? String == "subscriptionNotification",
+                      data["status"] as? String == "pending" else { continue }
+                try await document.reference.updateData([
+                    "status": "viewed",
+                    "updatedAt": FieldValue.serverTimestamp()
+                ])
+            }
+        } catch {
+            // Marking notification dots as viewed is non-critical; if older documents
+            // or stricter rules block it, keep the inbox readable.
+            lastError = nil
+        }
     }
 
     func share(_ recipe: Recipe, from profile: ButteryUserProfile, toUsername rawUsername: String) async throws {
@@ -97,14 +165,17 @@ final class SharingService {
             shareId: reference.documentID
         )
         let snapshot: [String: Any] = [
-            "title": recipe.title, "notes": recipe.notes, "prepTime": recipe.prepTime,
+            "title": RecipeImporter.cleanImportedRecipeField(recipe.title),
+            "notes": RecipeImporter.cleanImportedRecipeField(recipe.notes),
+            "prepTime": recipe.prepTime,
             "cookTime": recipe.cookTime, "totalTime": recipe.totalTime,
-            "servings": recipe.servings, "ingredients": recipe.ingredients,
-            "instructions": recipe.instructions,
+            "servings": recipe.servings,
+            "ingredients": RecipeImporter.cleanImportedRecipeField(recipe.ingredients),
+            "instructions": RecipeImporter.cleanImportedRecipeField(recipe.instructions),
             "photoUrls": media.photoUrls,
             "videoUrl": media.videoUrl ?? NSNull(),
             "sourceUrl": recipe.sourceUrl?.absoluteString ?? NSNull(),
-            "originalRawText": recipe.originalRawText
+            "originalRawText": RecipeImporter.cleanImportedRecipeField(recipe.originalRawText)
         ]
         try await reference.setData([
             "shareId": reference.documentID, "sourceRecipeId": recipe.id,
@@ -215,10 +286,13 @@ final class SharingService {
             sourceUrl: value["sourceUrl"] as? String, originalRawText: value["originalRawText"] as? String ?? ""
         )
         return ButteryRecipeShare(
-            id: document.documentID, fromUserId: fromId, fromUsername: fromUsername,
+            id: document.documentID,
+            type: data["type"] as? String ?? "recipeShare",
+            fromUserId: fromId, fromUsername: fromUsername,
             fromDisplayName: data["fromDisplayName"] as? String ?? fromUsername,
             fromProfilePhotoUrl: data["fromProfilePhotoUrl"] as? String,
             toUserId: toId, toUsername: toUsername, recipe: snapshot,
+            notificationMessage: data["message"] as? String,
             status: data["status"] as? String ?? "pending",
             createdAt: (data["createdAt"] as? Timestamp)?.dateValue()
         )

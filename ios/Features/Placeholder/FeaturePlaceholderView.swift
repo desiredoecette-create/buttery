@@ -36,9 +36,12 @@ struct FeaturePlaceholderView: View {
         case .continueRecipe: "play.circle"
         case .favorites: "heart"
         case .grocery: "cart"
+        case .explore: "globe.americas.fill"
         case .settings: "gearshape"
         case .inbox: "tray.full"
         case .privacySupport: "hand.raised"
+        case .myProfile: "person.crop.circle"
+        case .publicProfile: "person.crop.circle.badge.checkmark"
         }
     }
 }

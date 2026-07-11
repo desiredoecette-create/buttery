@@ -15,6 +15,13 @@ service cloud.firestore {
       allow read, update, delete: if ownsUser(userId);
     }
 
+    // Public creator profile data only. Keep private account fields such as email
+    // in users/{uid}, which remains owner-only above.
+    match /publicProfiles/{userId} {
+      allow read: if signedIn();
+      allow create, update, delete: if ownsUser(userId);
+    }
+
     // Public lookup contains only the UID needed to address a share. Reserve/release this
     // document in the same transaction as a profile username change.
     match /usernames/{usernameLowercase} {
@@ -27,7 +34,24 @@ service cloud.firestore {
 
     match /recipes/{recipeId} {
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if signedIn()
+        && (resource.data.ownerId == request.auth.uid
+          || resource.data.visibility == 'public');
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.visibility == 'public'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+        && request.resource.data.likeCount is int
+        && request.resource.data.likeCount >= 0;
+    }
+
+    match /recipeLikes/{recipeLikeId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.recipeId is string
+        && request.resource.data.ownerId is string;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /albums/{albumId} {
@@ -51,6 +75,20 @@ service cloud.firestore {
       allow delete: if signedIn()
         && (resource.data.toUserId == request.auth.uid
           || resource.data.fromUserId == request.auth.uid);
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow create: if signedIn()
+        && request.resource.data.subscriberUserId == request.auth.uid
+        && request.resource.data.creatorUserId is string;
+      allow read: if signedIn()
+        && (resource.data.subscriberUserId == request.auth.uid
+          || resource.data.creatorUserId == request.auth.uid);
+      allow update: if signedIn()
+        && resource.data.subscriberUserId == request.auth.uid
+        && request.resource.data.subscriberUserId == request.auth.uid;
+      allow delete: if signedIn()
+        && resource.data.subscriberUserId == request.auth.uid;
     }
   }
 }

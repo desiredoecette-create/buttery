@@ -304,6 +304,8 @@ struct RecipeDetailView: View {
 
 struct RecipeEditorView: View {
     @Environment(RecipeStore.self) private var store
+    @Environment(AuthService.self) private var auth
+    @Environment(SocialProfileService.self) private var social
     @Environment(\.dismiss) private var dismiss
     let recipeId: String?
     let onSaved: ((String) -> Void)?
@@ -365,6 +367,26 @@ struct RecipeEditorView: View {
                             .tint(ButteryTheme.paprika)
                             .disabled(newAlbumName.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
+                    }
+                    .padding(14)
+                    .editorBox()
+
+                    EditorSectionTitle("Visibility")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("Recipe Visibility", selection: Binding(
+                            get: { draft.visibility ?? .private },
+                            set: { draft.visibility = $0 }
+                        )) {
+                            Text("Private").tag(RecipeVisibility.private)
+                            Text("Public").tag(RecipeVisibility.public)
+                        }
+                        .pickerStyle(.segmented)
+                        .tint(ButteryTheme.herb)
+                        Text((draft.visibility ?? .private) == .public
+                             ? "Public recipes appear on your profile for other Buttery users to view."
+                             : "Private recipes stay only in your recipe book.")
+                            .font(.footnote)
+                            .foregroundStyle(ButteryTheme.charcoal.opacity(0.62))
                     }
                     .padding(14)
                     .editorBox()
@@ -440,6 +462,7 @@ struct RecipeEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let savedId = store.saveRecipe(draft, id: recipeId)
+                        syncVisibility(savedId: savedId)
                         onSaved?(savedId)
                         dismiss()
                     }
@@ -471,6 +494,22 @@ struct RecipeEditorView: View {
                     }
                     selectedVideo = nil
                 }
+            }
+        }
+    }
+
+    private func syncVisibility(savedId: String) {
+        guard let profile = auth.profile,
+              let recipe = store.recipes.first(where: { $0.id == savedId }) else { return }
+        Task {
+            do {
+                if (recipe.visibility ?? .private) == .public {
+                    try await social.publish(recipe, profile: profile)
+                } else if recipeId != nil {
+                    try await social.unpublish(recipeId: recipe.id, ownerId: profile.uid)
+                }
+            } catch {
+                social.lastError = error.localizedDescription
             }
         }
     }
