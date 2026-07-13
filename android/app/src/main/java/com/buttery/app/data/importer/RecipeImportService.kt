@@ -177,7 +177,7 @@ object RecipeImportService {
             servings = readYield(json.opt("recipeYield")),
             ingredients = ingredients.joinToString("\n") { cleanText(it) },
             instructions = cleanSteps.mapIndexed { index, step -> "${index + 1}. $step" }
-                .joinToString("\n"),
+                .joinToString("\n\n"),
             imageUrl = readImageUrl(json.opt("image")),
             sourceUrl = sourceUrl,
             originalRawText = originalJson.take(MAX_STORED_RAW_CHARS),

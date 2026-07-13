@@ -7,6 +7,7 @@ import com.buttery.app.data.local.RecipeEntity
 import com.buttery.app.domain.ParsedRecipe
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
+import com.buttery.app.domain.RecipeVisibility
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -36,6 +37,9 @@ class RecipeRepository(
             if (ownerId == null) flowOf(null) else recipeDao.observeById(id, ownerId)
         }.map { it?.toDomain() }
 
+    suspend fun getRecipe(id: Long): Recipe? =
+        recipeDao.getById(id, requireOwner())?.toDomain()
+
     fun setActiveOwner(ownerId: String?) {
         activeOwnerId.value = ownerId
     }
@@ -64,7 +68,8 @@ class RecipeRepository(
         videoUri: String?,
         photoUris: List<String> = listOfNotNull(photoUri),
         sourceUrl: String? = recipe.sourceUrl,
-        originalRawText: String = recipe.originalRawText
+        originalRawText: String = recipe.originalRawText,
+        visibility: RecipeVisibility = RecipeVisibility.Private
     ): Long {
         val ownerId = requireOwner()
         val savedAlbumId = albumId?.takeIf { albumDao.getById(it, ownerId) != null }
@@ -88,7 +93,9 @@ class RecipeRepository(
                 originalRawText = originalRawText,
                 albumId = savedAlbumId,
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
+                visibility = visibility.value,
+                publicPublishedAt = if (visibility == RecipeVisibility.Public) now else null
             )
         )
     }
@@ -122,7 +129,8 @@ class RecipeRepository(
         photoUri: String?,
         videoUri: String?,
         photoUris: List<String>,
-        isFavorite: Boolean
+        isFavorite: Boolean,
+        visibility: RecipeVisibility = RecipeVisibility.Private
     ) {
         val ownerId = requireOwner()
         val existing = recipeDao.getById(recipeId, ownerId) ?: return
@@ -145,9 +153,37 @@ class RecipeRepository(
                 originalRawText = recipe.originalRawText,
                 albumId = savedAlbumId,
                 updatedAt = System.currentTimeMillis(),
-                isFavorite = isFavorite
+                isFavorite = isFavorite,
+                visibility = visibility.value,
+                publicPublishedAt = if (visibility == RecipeVisibility.Public) {
+                    existing.publicPublishedAt ?: System.currentTimeMillis()
+                } else {
+                    existing.publicPublishedAt
+                }
             )
         )
+    }
+
+    suspend fun updateVisibility(
+        recipeId: Long,
+        visibility: RecipeVisibility,
+        likeCount: Int? = null
+    ): Recipe? {
+        val ownerId = requireOwner()
+        val existing = recipeDao.getById(recipeId, ownerId) ?: return null
+        val now = System.currentTimeMillis()
+        val updated = existing.copy(
+            visibility = visibility.value,
+            likeCount = likeCount ?: existing.likeCount,
+            publicPublishedAt = when {
+                visibility == RecipeVisibility.Public && existing.publicPublishedAt == null -> now
+                visibility == RecipeVisibility.Public -> existing.publicPublishedAt
+                else -> existing.publicPublishedAt
+            },
+            updatedAt = now
+        )
+        recipeDao.update(updated)
+        return updated.toDomain()
     }
 
     suspend fun deleteRecipe(id: Long) {
@@ -179,7 +215,10 @@ class RecipeRepository(
         albumId = albumId,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
+        visibility = RecipeVisibility.from(visibility),
+        likeCount = likeCount,
+        publicPublishedAt = publicPublishedAt
     )
 
     private fun RecipeAlbumEntity.toDomain() = RecipeAlbum(

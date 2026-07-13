@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +71,7 @@ import com.buttery.app.domain.ParsedRecipe
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
 import com.buttery.app.domain.RecipeParser
+import com.buttery.app.domain.RecipeVisibility
 import kotlinx.coroutines.launch
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -84,11 +86,30 @@ fun NewRecipeScreen(
     onImportRecipe: () -> Unit
 ) {
     RecipePage(title = "Add a new recipe", onBack = onBack) {
+        val isPhone = LocalConfiguration.current.screenWidthDp < 700
         Text("Choose how you would like to begin.", color = Ink.copy(alpha = 0.7f), fontSize = 19.sp)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
+        if (isPhone) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                ChoiceCard(
+                    title = "Create Manually",
+                    subtitle = "Enter ingredients, instructions, timing, and media.",
+                    icon = Icons.Rounded.Add,
+                    onClick = onCreateManually,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                ChoiceCard(
+                    title = "Import Recipe",
+                    subtitle = "Paste recipe text and review the extracted details.",
+                    icon = Icons.Rounded.Upload,
+                    onClick = onImportRecipe,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
             ChoiceCard(
                 title = "Create Manually",
                 subtitle = "Enter ingredients, instructions, timing, and media.",
@@ -103,6 +124,7 @@ fun NewRecipeScreen(
                 onClick = onImportRecipe,
                 modifier = Modifier.weight(1f)
             )
+            }
         }
     }
 }
@@ -115,23 +137,24 @@ private fun ChoiceCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     Surface(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 250.dp),
+        modifier = modifier.heightIn(min = if (isPhone) 150.dp else 250.dp),
         shape = RoundedCornerShape(8.dp),
         color = Color.White,
         shadowElevation = 4.dp
     ) {
         Column(
-            modifier = Modifier.padding(30.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier.padding(if (isPhone) 22.dp else 30.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 18.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Surface(shape = RoundedCornerShape(50), color = Accent) {
-                Icon(icon, null, tint = Color.White, modifier = Modifier.padding(17.dp).size(34.dp))
+                Icon(icon, null, tint = Color.White, modifier = Modifier.padding(if (isPhone) 13.dp else 17.dp).size(if (isPhone) 28.dp else 34.dp))
             }
-            Text(title, color = Ink, fontFamily = FontFamily.Serif, fontSize = 30.sp)
-            Text(subtitle, color = Ink.copy(alpha = 0.68f), fontSize = 18.sp, lineHeight = 26.sp)
+            Text(title, color = Ink, fontFamily = FontFamily.Serif, fontSize = if (isPhone) 27.sp else 30.sp)
+            Text(subtitle, color = Ink.copy(alpha = 0.68f), fontSize = if (isPhone) 16.sp else 18.sp, lineHeight = if (isPhone) 22.sp else 26.sp)
         }
     }
 }
@@ -141,7 +164,7 @@ fun ManualRecipeEntryScreen(
     albums: List<RecipeAlbum>,
     onBack: () -> Unit,
     onCreateAlbum: suspend (String) -> Long,
-    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?) -> Long,
+    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?, RecipeVisibility) -> Long,
     onViewRecipe: (Long) -> Unit
 ) {
     var recipe by remember { mutableStateOf(ParsedRecipe()) }
@@ -150,6 +173,7 @@ fun ManualRecipeEntryScreen(
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var mediaMessage by remember { mutableStateOf<String?>(null) }
     var selectedAlbumId by remember { mutableStateOf<Long?>(null) }
+    var visibility by remember { mutableStateOf(RecipeVisibility.Private) }
     var newAlbumName by remember { mutableStateOf("") }
     var validationMessage by remember { mutableStateOf<String?>(null) }
     var savedRecipeId by remember { mutableStateOf<Long?>(null) }
@@ -226,8 +250,10 @@ fun ManualRecipeEntryScreen(
                 }
             }
         )
+        VisibilityChooser(visibility = visibility, onVisibilityChange = { visibility = it })
         SaveButton(
             enabled = !isSaving && savedRecipeId == null,
+            isSaving = isSaving,
             onClick = {
                 validationMessage = when {
                     recipe.title.isBlank() -> "Add a recipe title before saving."
@@ -243,7 +269,8 @@ fun ManualRecipeEntryScreen(
                             selectedAlbumId,
                             photoUri?.toString(),
                             photoUris.map(Uri::toString),
-                            videoUri?.toString()
+                            videoUri?.toString(),
+                            visibility
                         )
                         isSaving = false
                         savedRecipeId?.let(onViewRecipe)
@@ -280,7 +307,7 @@ fun EditRecipeScreen(
     existingRecipe: Recipe,
     albums: List<RecipeAlbum>,
     onBack: () -> Unit,
-    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?, Boolean) -> Unit,
+    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?, Boolean, RecipeVisibility) -> Unit,
     onSaved: () -> Unit
 ) {
     var recipe by remember(existingRecipe.id) {
@@ -311,6 +338,7 @@ fun EditRecipeScreen(
     }
     var selectedAlbumId by remember(existingRecipe.id) { mutableStateOf<Long?>(existingRecipe.albumId) }
     var isFavorite by remember(existingRecipe.id) { mutableStateOf(existingRecipe.isFavorite) }
+    var visibility by remember(existingRecipe.id) { mutableStateOf(existingRecipe.visibility) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var mediaMessage by remember { mutableStateOf<String?>(null) }
@@ -385,8 +413,10 @@ fun EditRecipeScreen(
             onClick = { isFavorite = !isFavorite },
             label = { Text(if (isFavorite) "Favorite" else "Mark as favorite", fontSize = 16.sp) }
         )
+        VisibilityChooser(visibility = visibility, onVisibilityChange = { visibility = it })
         SaveButton(
             enabled = !isSaving,
+            isSaving = isSaving,
             onClick = {
                 validationMessage = when {
                     recipe.title.isBlank() -> "Add a recipe title before saving."
@@ -403,8 +433,10 @@ fun EditRecipeScreen(
                             photoUri?.toString(),
                             photoUris.map(Uri::toString),
                             videoUri?.toString(),
-                            isFavorite
+                            isFavorite,
+                            visibility
                         )
+                        isSaving = false
                         onSaved()
                     }
                 }
@@ -690,7 +722,7 @@ fun RecipeReviewScreen(
     albums: List<RecipeAlbum>,
     onBack: () -> Unit,
     onCreateAlbum: suspend (String) -> Long,
-    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?) -> Long,
+    onSave: suspend (ParsedRecipe, Long?, String?, List<String>, String?, RecipeVisibility) -> Long,
     onViewRecipe: (Long) -> Unit
 ) {
     var recipe by remember(initialRecipe) { mutableStateOf(initialRecipe) }
@@ -702,6 +734,7 @@ fun RecipeReviewScreen(
     }
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var selectedAlbumId by remember { mutableStateOf<Long?>(null) }
+    var visibility by remember { mutableStateOf(RecipeVisibility.Private) }
     var newAlbumName by remember { mutableStateOf("") }
     var showOriginalText by remember { mutableStateOf(false) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
@@ -816,8 +849,10 @@ fun RecipeReviewScreen(
                 }
             }
         )
+        VisibilityChooser(visibility = visibility, onVisibilityChange = { visibility = it })
         SaveButton(
             enabled = !isSaving && savedRecipeId == null,
+            isSaving = isSaving,
             onClick = {
                 validationMessage = when {
                     recipe.title.isBlank() -> "Add a recipe title before saving."
@@ -833,7 +868,8 @@ fun RecipeReviewScreen(
                             selectedAlbumId,
                             photoUri?.toString(),
                             photoUris.map(Uri::toString),
-                            videoUri?.toString()
+                            videoUri?.toString(),
+                            visibility
                         )
                         isSaving = false
                         savedRecipeId?.let(onViewRecipe)
@@ -872,20 +908,104 @@ private fun RecipeForm(
     onAddPhoto: () -> Unit = {},
     onAddVideo: () -> Unit = {}
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     RecipeField("Recipe title", recipe.title) { onRecipeChange(recipe.copy(title = it)) }
     RecipeField("Description / notes", recipe.notes, minLines = 3) { onRecipeChange(recipe.copy(notes = it)) }
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(Modifier.weight(1f)) { RecipeField("Prep time", recipe.prepTime) { onRecipeChange(recipe.copy(prepTime = it)) } }
-        Box(Modifier.weight(1f)) { RecipeField("Cook time", recipe.cookTime) { onRecipeChange(recipe.copy(cookTime = it)) } }
-        Box(Modifier.weight(1f)) { RecipeField("Total time", recipe.totalTime) { onRecipeChange(recipe.copy(totalTime = it)) } }
-        Box(Modifier.weight(1f)) { RecipeField("Servings", recipe.servings) { onRecipeChange(recipe.copy(servings = it)) } }
+    if (isPhone) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { RecipeField("Prep time", recipe.prepTime) { onRecipeChange(recipe.copy(prepTime = it)) } }
+                Box(Modifier.weight(1f)) { RecipeField("Cook time", recipe.cookTime) { onRecipeChange(recipe.copy(cookTime = it)) } }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { RecipeField("Total time", recipe.totalTime) { onRecipeChange(recipe.copy(totalTime = it)) } }
+                Box(Modifier.weight(1f)) { RecipeField("Servings", recipe.servings) { onRecipeChange(recipe.copy(servings = it)) } }
+            }
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.weight(1f)) { RecipeField("Prep time", recipe.prepTime) { onRecipeChange(recipe.copy(prepTime = it)) } }
+            Box(Modifier.weight(1f)) { RecipeField("Cook time", recipe.cookTime) { onRecipeChange(recipe.copy(cookTime = it)) } }
+            Box(Modifier.weight(1f)) { RecipeField("Total time", recipe.totalTime) { onRecipeChange(recipe.copy(totalTime = it)) } }
+            Box(Modifier.weight(1f)) { RecipeField("Servings", recipe.servings) { onRecipeChange(recipe.copy(servings = it)) } }
+        }
     }
     RecipeField("Ingredients", recipe.ingredients, minLines = 6) { onRecipeChange(recipe.copy(ingredients = it)) }
     RecipeField("Instructions", recipe.instructions, minLines = 7) { onRecipeChange(recipe.copy(instructions = it)) }
     if (includeMedia) {
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            MediaButton(photoName ?: "Add photo", Icons.Rounded.Image, onAddPhoto)
-            MediaButton(videoName ?: "Add video", Icons.Rounded.Videocam, onAddVideo)
+        if (isPhone) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MediaButton(photoName ?: "Add photo", Icons.Rounded.Image, onAddPhoto, modifier = Modifier.fillMaxWidth())
+                MediaButton(videoName ?: "Add video", Icons.Rounded.Videocam, onAddVideo, modifier = Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                MediaButton(photoName ?: "Add photo", Icons.Rounded.Image, onAddPhoto)
+                MediaButton(videoName ?: "Add video", Icons.Rounded.Videocam, onAddVideo)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VisibilityChooser(
+    visibility: RecipeVisibility,
+    onVisibilityChange: (RecipeVisibility) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Visibility", color = Ink, fontFamily = FontFamily.Serif, fontSize = 27.sp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.55f), RoundedCornerShape(22.dp))
+                .border(1.dp, Ink.copy(alpha = 0.12f), RoundedCornerShape(22.dp))
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            VisibilityOption(
+                label = "Private",
+                selected = visibility == RecipeVisibility.Private,
+                modifier = Modifier.weight(1f),
+                onClick = { onVisibilityChange(RecipeVisibility.Private) }
+            )
+            VisibilityOption(
+                label = "Public",
+                selected = visibility == RecipeVisibility.Public,
+                modifier = Modifier.weight(1f),
+                onClick = { onVisibilityChange(RecipeVisibility.Public) }
+            )
+        }
+        Text(
+            if (visibility == RecipeVisibility.Public) {
+                "Public recipes can appear on your profile and Explore."
+            } else {
+                "Private recipes stay in your recipe albums."
+            },
+            color = Ink.copy(alpha = 0.62f),
+            fontSize = 15.sp
+        )
+    }
+}
+
+@Composable
+private fun VisibilityOption(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 52.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = if (selected) Color(0xFF748463).copy(alpha = 0.82f) else Color.Transparent
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                label,
+                color = if (selected) Color.White else Ink.copy(alpha = 0.74f),
+                fontSize = 18.sp
+            )
         }
     }
 }
@@ -971,22 +1091,31 @@ private fun RecipeField(label: String, value: String, minLines: Int = 1, onChang
 }
 
 @Composable
-private fun MediaButton(label: String, icon: ImageVector, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.heightIn(min = 56.dp)) {
+private fun MediaButton(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 56.dp)) {
         Icon(icon, null)
         Text("  $label", fontSize = 17.sp, maxLines = 1)
     }
 }
 
 @Composable
-private fun SaveButton(enabled: Boolean = true, onClick: () -> Unit) {
+private fun SaveButton(enabled: Boolean = true, isSaving: Boolean = false, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Accent)
     ) {
-        Text("Save Recipe", fontSize = 19.sp)
+        if (isSaving) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(22.dp)
+            )
+            Text("  Saving Recipe…", fontSize = 19.sp)
+        } else {
+            Text("Save Recipe", fontSize = 19.sp)
+        }
     }
 }
 
@@ -997,16 +1126,25 @@ private fun RecipePage(
     scrollable: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     val bodyModifier = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
     Column(
-        modifier = Modifier.fillMaxSize().background(PageBackground).padding(horizontal = 40.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PageBackground)
+            .padding(
+                start = if (isPhone) 22.dp else 40.dp,
+                end = if (isPhone) 22.dp else 40.dp,
+                top = if (isPhone) 54.dp else 24.dp,
+                bottom = if (isPhone) 18.dp else 24.dp
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (isPhone) 16.dp else 20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            IconButton(onClick = onBack, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Ink, modifier = Modifier.size(32.dp))
+            IconButton(onClick = onBack, modifier = Modifier.size(if (isPhone) 46.dp else 56.dp)) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Ink, modifier = Modifier.size(if (isPhone) 28.dp else 32.dp))
             }
-            Text(title, color = Ink, fontFamily = FontFamily.Serif, fontSize = 36.sp)
+            Text(title, color = Ink, fontFamily = FontFamily.Serif, fontSize = if (isPhone) 31.sp else 36.sp)
         }
         Column(
             modifier = bodyModifier.fillMaxWidth().padding(bottom = 28.dp),

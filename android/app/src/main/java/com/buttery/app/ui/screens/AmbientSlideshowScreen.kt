@@ -100,10 +100,10 @@ fun AmbientSlideshowScreen(modifier: Modifier = Modifier) {
             contentDescription = "Buttery",
             contentScale = ContentScale.Fit,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 30.dp, bottom = 20.dp)
-                .width(176.dp)
-                .height(88.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 64.dp)
+                .width(126.dp)
+                .height(64.dp)
         )
     }
 }

@@ -274,6 +274,45 @@ class AccountRepository(context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
         ).await()
+        database.collection("publicProfiles").document(current.userId).set(
+            mapOf(
+                "uid" to current.userId,
+                "username" to current.username,
+                "displayName" to cleanName,
+                "profilePhotoUrl" to (uploadedPhoto ?: ""),
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "schemaVersion" to 1
+            ),
+            com.google.firebase.firestore.SetOptions.merge()
+        ).await()
+        database.collection("recipes")
+            .whereEqualTo("ownerId", current.userId)
+            .get()
+            .await()
+            .documents
+            .forEach { document ->
+                document.reference.update(
+                    mapOf(
+                        "ownerDisplayName" to cleanName,
+                        "ownerProfilePhotoUrl" to (uploadedPhoto ?: ""),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+        database.collection(SHARES)
+            .whereEqualTo("fromUserId", current.userId)
+            .get()
+            .await()
+            .documents
+            .forEach { document ->
+                document.reference.update(
+                    mapOf(
+                        "fromDisplayName" to cleanName,
+                        "fromProfilePhotoUrl" to (uploadedPhoto ?: ""),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
         setSession(updated)
         updated
     }.fold(
@@ -388,6 +427,46 @@ class AccountRepository(context: Context) {
                     }
                 }
             }
+        }
+
+    suspend fun shareCommunityRecipe(recipe: CommunityRecipe, recipient: UserProfile, message: String = ""): Result<Unit> =
+        runCatching {
+            val sender = _currentUser.value ?: throw IllegalStateException("Sign in first.")
+            if (sender.userId == recipient.userId) throw IllegalArgumentException("Choose another user.")
+            val shareRef = database.collection(SHARES).document()
+            val snapshot = mapOf(
+                "title" to recipe.title,
+                "notes" to recipe.notes,
+                "prepTime" to recipe.prepTime,
+                "cookTime" to recipe.cookTime,
+                "totalTime" to recipe.totalTime,
+                "servings" to recipe.servings,
+                "ingredients" to recipe.ingredients,
+                "instructions" to recipe.instructions,
+                "photoUrls" to recipe.photoUrls,
+                "videoUrl" to (recipe.videoUrls.firstOrNull() ?: ""),
+                "imageUrl" to (recipe.thumbnailUrl ?: ""),
+                "sourceUrl" to (recipe.sourceUrl ?: ""),
+                "originalRawText" to ""
+            )
+            shareRef.set(
+                mapOf(
+                    "shareId" to shareRef.id,
+                    "sourceRecipeId" to recipe.id,
+                    "fromUserId" to sender.userId,
+                    "fromUsername" to sender.username,
+                    "fromDisplayName" to sender.displayName,
+                    "fromProfilePhotoUrl" to (sender.profilePhotoUri ?: ""),
+                    "toUserId" to recipient.userId,
+                    "toUsername" to recipient.username.lowercase(),
+                    "recipeSnapshot" to snapshot,
+                    "message" to message.trim(),
+                    "status" to STATUS_PENDING,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                    "schemaVersion" to 1
+                )
+            ).await()
         }
 
     suspend fun markShare(shareId: String, status: String) {

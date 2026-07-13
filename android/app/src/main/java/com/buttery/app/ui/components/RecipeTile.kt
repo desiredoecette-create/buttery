@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -33,11 +34,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 
 data class RecipeTileData(
     val title: String,
@@ -50,7 +55,7 @@ data class RecipeTileData(
     val action: String = title
 )
 
-enum class RecipeTileIcon { Search, Add, Continue, Favorite, Grocery, Settings }
+enum class RecipeTileIcon { Search, Add, Continue, Favorite, Grocery, Settings, Explore }
 
 private fun RecipeTileIcon.imageVector(): ImageVector = when (this) {
     RecipeTileIcon.Search -> Icons.Rounded.Search
@@ -59,6 +64,7 @@ private fun RecipeTileIcon.imageVector(): ImageVector = when (this) {
     RecipeTileIcon.Favorite -> Icons.Rounded.FavoriteBorder
     RecipeTileIcon.Grocery -> Icons.Rounded.ShoppingCart
     RecipeTileIcon.Settings -> Icons.Rounded.Settings
+    RecipeTileIcon.Explore -> Icons.Rounded.Public
 }
 
 @Composable
@@ -67,6 +73,7 @@ fun RecipeTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     Surface(
         modifier = modifier
             .aspectRatio(1.58f)
@@ -85,16 +92,25 @@ fun RecipeTile(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                AndroidView(
-                    factory = { context ->
-                        ImageView(context).apply {
-                            scaleType = ImageView.ScaleType.CENTER_CROP
-                            contentDescription = "Recipe photo"
-                        }
-                    },
-                    update = { it.setImageURI(Uri.parse(tile.photoUri)) },
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (tile.photoUri.startsWith("http://") || tile.photoUri.startsWith("https://")) {
+                    AsyncImage(
+                        model = tile.photoUri,
+                        contentDescription = "Recipe photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    AndroidView(
+                        factory = { context ->
+                            ImageView(context).apply {
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                contentDescription = "Recipe photo"
+                            }
+                        },
+                        update = { it.setImageURI(Uri.parse(tile.photoUri)) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -111,8 +127,9 @@ fun RecipeTile(
             )
             Surface(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(58.dp),
+                    .align(if (isPhone) Alignment.Center else Alignment.Center)
+                    .padding(bottom = if (isPhone) 18.dp else 0.dp)
+                    .size(if (isPhone) 48.dp else 58.dp),
                 shape = RoundedCornerShape(50),
                 color = Color.Black.copy(alpha = 0.4f),
                 border = BorderStroke(1.dp, Color(0xFFF4EFE6).copy(alpha = 0.78f))
@@ -121,14 +138,14 @@ fun RecipeTile(
                     imageVector = tile.icon.imageVector(),
                     contentDescription = null,
                     tint = Color(0xFFF4EFE6),
-                    modifier = Modifier.padding(14.dp)
+                    modifier = Modifier.padding(if (isPhone) 12.dp else 14.dp)
                 )
             }
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 13.dp),
+                    .padding(horizontal = if (isPhone) 8.dp else 12.dp, vertical = if (isPhone) 9.dp else 13.dp),
                 horizontalAlignment = if (tile.eyebrow == null) {
                     Alignment.CenterHorizontally
                 } else {
@@ -139,22 +156,25 @@ fun RecipeTile(
                     Text(
                         text = it,
                         color = Color(0xFFFFC857),
-                        fontSize = 12.sp,
+                        fontSize = if (isPhone) 10.sp else 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
                     text = tile.title,
                     color = Color(0xFFF4EFE6),
-                    fontSize = 19.sp,
+                    fontSize = if (isPhone) 16.sp else 19.sp,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1
+                    maxLines = 2,
+                    lineHeight = if (isPhone) 18.sp else 22.sp,
+                    textAlign = if (tile.eyebrow == null) TextAlign.Center else TextAlign.Start,
+                    overflow = TextOverflow.Ellipsis
                 )
                 tile.subtitle?.let {
-                    Text(it, color = Color(0xFFF4EFE6).copy(alpha = 0.8f), fontSize = 13.sp)
+                    Text(it, color = Color(0xFFF4EFE6).copy(alpha = 0.8f), fontSize = if (isPhone) 11.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 tile.footer?.let {
-                    Text(it, color = Color(0xFFFFC857), fontSize = 12.sp, maxLines = 1)
+                    Text(it, color = Color(0xFFFFC857), fontSize = if (isPhone) 10.sp else 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

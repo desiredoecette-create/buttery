@@ -49,5 +49,8 @@ data class RecipeEntity(
     val albumId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val visibility: String = "private",
+    val likeCount: Int = 0,
+    val publicPublishedAt: Long? = null
 )

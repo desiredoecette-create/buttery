@@ -8,6 +8,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
@@ -74,6 +77,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
@@ -83,8 +87,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
+import com.buttery.app.domain.RecipeVisibility
 
 private val BrowseBackground = Color(0xFF11110E)
 private val BrowsePanel = Color(0xFF1B1A15)
@@ -409,6 +417,7 @@ private fun FavoritesEmptyState(
 
 @Composable
 private fun BrowseScaffold(content: @Composable ColumnScope.() -> Unit) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -420,8 +429,15 @@ private fun BrowseScaffold(content: @Composable ColumnScope.() -> Unit) {
             )
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 34.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = if (isPhone) 22.dp else 34.dp,
+                    end = if (isPhone) 22.dp else 34.dp,
+                    top = if (isPhone) 58.dp else 24.dp,
+                    bottom = if (isPhone) 22.dp else 24.dp
+                ),
+            verticalArrangement = Arrangement.spacedBy(if (isPhone) 16.dp else 22.dp),
             content = content
         )
     }
@@ -437,32 +453,68 @@ private fun BrowseTopBar(
     onHome: () -> Unit,
     onBack: (() -> Unit)? = null
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (onBack != null) {
-            RoundBrowseButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to All Albums", onBack)
-        }
-        RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                title,
-                color = BrowseCream,
-                fontFamily = FontFamily.Serif,
-                fontSize = 36.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    if (isPhone) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onBack != null) {
+                    RoundBrowseButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to All Albums", onBack)
+                }
+                RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        title,
+                        color = BrowseCream,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 31.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(subtitle, color = BrowseMuted, fontSize = 14.sp)
+                }
+            }
+            BrowseSearchField(
+                value = search,
+                onValueChange = onSearchChange,
+                placeholder = searchHint,
+                modifier = Modifier.fillMaxWidth()
             )
-            Text(subtitle, color = BrowseMuted, fontSize = 16.sp)
         }
-        BrowseSearchField(
-            value = search,
-            onValueChange = onSearchChange,
-            placeholder = searchHint,
-            modifier = Modifier.fillMaxWidth(0.36f)
-        )
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (onBack != null) {
+                RoundBrowseButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to All Albums", onBack)
+            }
+            RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    title,
+                    color = BrowseCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 36.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(subtitle, color = BrowseMuted, fontSize = 16.sp)
+            }
+            BrowseSearchField(
+                value = search,
+                onValueChange = onSearchChange,
+                placeholder = searchHint,
+                modifier = Modifier.fillMaxWidth(0.36f)
+            )
+        }
     }
 }
 
@@ -666,16 +718,7 @@ private fun ImageCardBackground(uri: String?) {
             )
         }
     } else {
-        AndroidView(
-            factory = { context ->
-                ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    contentDescription = "Recipe photo"
-                }
-            },
-            update = { it.setImageURI(Uri.parse(uri)) },
-            modifier = Modifier.fillMaxSize()
-        )
+        RecipeImage(uri, Modifier.fillMaxSize())
     }
 }
 
@@ -942,9 +985,29 @@ fun RecipeDetailScreen(
     onBackToAlbum: () -> Unit,
     onHome: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
+    onVisibilityChanged: (RecipeVisibility) -> Unit,
     onEdit: (Recipe) -> Unit,
     onShare: (Recipe) -> Unit
 ) {
+    var enlargedPhotoUri by remember(recipe?.id) { mutableStateOf<String?>(null) }
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    if (isPhone) {
+        PhoneRecipeDetailScreen(
+            recipe = recipe,
+            albumName = albumName,
+            backLabel = backLabel,
+            onBackToAlbum = onBackToAlbum,
+            onHome = onHome,
+            onFavoriteChanged = onFavoriteChanged,
+            onVisibilityChanged = onVisibilityChanged,
+            onEdit = onEdit,
+            onShare = onShare,
+            enlargedPhotoUri = enlargedPhotoUri,
+            onPhotoClick = { enlargedPhotoUri = it },
+            onDismissPhoto = { enlargedPhotoUri = null }
+        )
+        return
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -982,6 +1045,20 @@ fun RecipeDetailScreen(
                     )
                 }
                 RoundBrowseButton(Icons.Rounded.Edit, "Edit") { recipe?.let(onEdit) }
+                RoundBrowseButton(
+                    if (recipe?.visibility == RecipeVisibility.Public) Icons.Rounded.Lock else Icons.Rounded.Public,
+                    if (recipe?.visibility == RecipeVisibility.Public) "Make private" else "Make public"
+                ) {
+                    recipe?.let {
+                        onVisibilityChanged(
+                            if (it.visibility == RecipeVisibility.Public) {
+                                RecipeVisibility.Private
+                            } else {
+                                RecipeVisibility.Public
+                            }
+                        )
+                    }
+                }
                 RoundBrowseButton(Icons.Rounded.Share, "Share") { recipe?.let(onShare) }
                 RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
                 RoundBrowseButton(Icons.Rounded.Close, "Close", onBackToAlbum)
@@ -1017,7 +1094,10 @@ fun RecipeDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
                     if (recipe.photoUris.isNotEmpty()) {
-                        RecipePhotoGallery(recipe.photoUris)
+                        RecipePhotoGallery(
+                            photoUris = recipe.photoUris,
+                            onPhotoClick = { enlargedPhotoUri = it }
+                        )
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1088,24 +1168,245 @@ fun RecipeDetailScreen(
                 }
             }
         }
+        enlargedPhotoUri?.let { photoUri ->
+            EnlargedRecipePhotoDialog(
+                photoUri = photoUri,
+                onDismiss = { enlargedPhotoUri = null }
+            )
+        }
     }
 }
 
 @Composable
-private fun RecipePhotoGallery(photoUris: List<String>) {
+private fun PhoneRecipeDetailScreen(
+    recipe: Recipe?,
+    albumName: String,
+    backLabel: String,
+    onBackToAlbum: () -> Unit,
+    onHome: () -> Unit,
+    onFavoriteChanged: (Boolean) -> Unit,
+    onVisibilityChanged: (RecipeVisibility) -> Unit,
+    onEdit: (Recipe) -> Unit,
+    onShare: (Recipe) -> Unit,
+    enlargedPhotoUri: String?,
+    onPhotoClick: (String) -> Unit,
+    onDismissPhoto: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    listOf(Color(0xFF49331E), Color(0xE60A0A08)),
+                    radius = 1_300f
+                )
+            )
+            .padding(start = 18.dp, end = 18.dp, top = 54.dp, bottom = 18.dp)
+    ) {
+        if (recipe == null) {
+            Text(
+                "Recipe not found.",
+                color = BrowseCream,
+                fontSize = 22.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            return@Box
+        }
+
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onBackToAlbum,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.55f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, modifier = Modifier.size(17.dp))
+                    Text("  $backLabel", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+                }
+                RoundBrowseButton(Icons.Rounded.Edit, "Edit") { onEdit(recipe) }
+                RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
+            }
+
+            if (recipe.photoUris.isNotEmpty()) {
+                RecipePhotoGallery(
+                    photoUris = recipe.photoUris,
+                    onPhotoClick = onPhotoClick
+                )
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(28.dp),
+                color = Paper,
+                shadowElevation = 18.dp
+            ) {
+                Box {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 22.dp, vertical = 26.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF687A48),
+                            shadowElevation = 4.dp
+                        ) {
+                            Text(
+                                "🍳  Cooking Mode Active",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                            )
+                        }
+                        Text(
+                            recipe.title,
+                            color = PaperInk,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 34.sp,
+                            lineHeight = 38.sp
+                        )
+                        Text(albumName, color = Color(0xFF745B33), fontSize = 15.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                            DetailFact("Prep", recipe.prepTime)
+                            DetailFact("Cook", recipe.cookTime)
+                            DetailFact("Serves", recipe.servings)
+                        }
+                        if (recipe.notes.isNotBlank()) {
+                            Text(
+                                recipe.notes,
+                                color = PaperInk.copy(alpha = 0.78f),
+                                fontSize = 16.sp,
+                                lineHeight = 23.sp
+                            )
+                        }
+                        PaperSection("Ingredients", recipe.ingredients.ifBlank { "No ingredients added." })
+                        PaperSection("Instructions", recipe.instructions.ifBlank { "No instructions added." })
+                        if (recipe.videoUri != null) {
+                            RecipeVideo(recipe.videoUri)
+                        }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .background(Paper.copy(alpha = 0.78f), RoundedCornerShape(26.dp))
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        IconButton(onClick = { onFavoriteChanged(!recipe.isFavorite) }, modifier = Modifier.size(42.dp)) {
+                            Icon(
+                                if (recipe.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                contentDescription = "Toggle favorite",
+                                tint = if (recipe.isFavorite) Color(0xFFB95143) else PaperInk,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        IconButton(onClick = { onShare(recipe) }, modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Rounded.Share, "Share", tint = PaperInk, modifier = Modifier.size(21.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                onVisibilityChanged(
+                                    if (recipe.visibility == RecipeVisibility.Public) RecipeVisibility.Private else RecipeVisibility.Public
+                                )
+                            },
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(
+                                if (recipe.visibility == RecipeVisibility.Public) Icons.Rounded.Lock else Icons.Rounded.Public,
+                                contentDescription = "Change visibility",
+                                tint = PaperInk,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        enlargedPhotoUri?.let { photoUri ->
+            EnlargedRecipePhotoDialog(photoUri = photoUri, onDismiss = onDismissPhoto)
+        }
+    }
+}
+
+@Composable
+private fun RecipePhotoGallery(photoUris: List<String>, onPhotoClick: (String) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         photoUris.forEach { photoUri ->
-            AndroidView(
-            factory = { context ->
-                ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-            },
-            update = { it.setImageURI(Uri.parse(photoUri)) },
-            modifier = Modifier.size(310.dp, 190.dp).clip(RoundedCornerShape(18.dp))
-        )
+            RecipeImage(
+                uri = photoUri,
+                modifier = Modifier
+                    .size(310.dp, 190.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onPhotoClick(photoUri) }
+            )
         }
+    }
+}
+
+@Composable
+private fun EnlargedRecipePhotoDialog(photoUri: String, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.86f))
+                .padding(34.dp)
+                .clickable(onClick = onDismiss)
+        ) {
+            RecipeImage(
+                uri = photoUri,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(24.dp))
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .background(Color.Black.copy(alpha = 0.58f), CircleShape)
+            ) {
+                Icon(Icons.Rounded.Close, contentDescription = "Close photo", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecipeImage(uri: String, modifier: Modifier = Modifier) {
+    if (uri.startsWith("http://") || uri.startsWith("https://")) {
+        AsyncImage(
+            model = uri,
+            contentDescription = "Recipe photo",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        AndroidView(
+            factory = { context ->
+                ImageView(context).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    contentDescription = "Recipe photo"
+                }
+            },
+            update = { it.setImageURI(Uri.parse(uri)) },
+            modifier = modifier
+        )
     }
 }
 

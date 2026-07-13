@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +33,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.buttery.app.R
 import com.buttery.app.domain.Recipe
+import com.buttery.app.ui.ButteryLayoutMode
 import com.buttery.app.ui.components.RecipeTile
 import com.buttery.app.ui.components.RecipeTileData
 import com.buttery.app.ui.components.RecipeTileIcon
 
 @Composable
 fun RecipeHomeScreen(
+    layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet,
     onTileSelected: (String) -> Unit,
     lastRecipe: Recipe?,
     lastRecipeAlbumName: String?,
@@ -48,8 +52,8 @@ fun RecipeHomeScreen(
 ) {
     val tiles = remember(lastRecipe, lastRecipeAlbumName, lastOpenedTimestamp) {
         listOf(
-            RecipeTileData("Browse Recipes", R.drawable.ambient_extra_01, RecipeTileIcon.Search),
-            RecipeTileData("Enter New Recipe", R.drawable.ambient_extra_02, RecipeTileIcon.Add),
+            RecipeTileData("My Recipes", R.drawable.ambient_extra_01, RecipeTileIcon.Search),
+            RecipeTileData("Explore Recipes", R.drawable.ambient_extra_06, RecipeTileIcon.Explore),
             if (lastRecipe == null) {
                 RecipeTileData("Continue Recipe", R.drawable.ambient_extra_03, RecipeTileIcon.Continue)
             } else {
@@ -66,8 +70,20 @@ fun RecipeHomeScreen(
             },
             RecipeTileData("Favorites", R.drawable.ambient_extra_04, RecipeTileIcon.Favorite),
             RecipeTileData("Grocery List", R.drawable.ambient_extra_05, RecipeTileIcon.Grocery),
-            RecipeTileData("Settings", R.drawable.ambient_extra_06, RecipeTileIcon.Settings)
+            RecipeTileData("Enter New Recipe", R.drawable.ambient_extra_02, RecipeTileIcon.Add)
         )
+    }
+
+    if (layoutMode == ButteryLayoutMode.Phone) {
+        PhoneRecipeHomeScreen(
+            tiles = tiles,
+            profilePhotoUri = profilePhotoUri,
+            hasProfileNotification = hasProfileNotification,
+            onProfile = onProfile,
+            onTileSelected = onTileSelected,
+            modifier = modifier
+        )
+        return
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -178,6 +194,129 @@ fun RecipeHomeScreen(
                 fontSize = 13.sp,
                 letterSpacing = 1.5.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun PhoneRecipeHomeScreen(
+    tiles: List<RecipeTileData>,
+    profilePhotoUri: String?,
+    hasProfileNotification: Boolean,
+    onProfile: () -> Unit,
+    onTileSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.home_background),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF15130F).copy(alpha = 0.96f),
+                            Color(0xFF211B13).copy(alpha = 0.9f),
+                            Color(0xFF2F2418).copy(alpha = 0.8f)
+                        )
+                    )
+                )
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 22.dp, end = 22.dp, top = 86.dp, bottom = 26.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = "Welcome back!",
+                        color = Color(0xFFF4EFE6),
+                        fontSize = 34.sp,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Normal
+                    )
+                    Text(
+                        text = "What would you like to cook today?",
+                        color = Color(0xFFF4EFE6).copy(alpha = 0.82f),
+                        fontSize = 17.sp
+                    )
+                }
+                Box(modifier = Modifier.size(52.dp)) {
+                    IconButton(
+                        onClick = onProfile,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .align(Alignment.Center)
+                            .background(Color(0xFFF4EFE6), CircleShape)
+                            .border(2.dp, Color(0xFFFFC857), CircleShape)
+                    ) {
+                        ProfileAvatar(profilePhotoUri, 42)
+                    }
+                    if (hasProfileNotification) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(12.dp)
+                                .background(Color(0xFFD7433B), CircleShape)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                tiles.chunked(2).forEach { rowTiles ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowTiles.forEach { tile ->
+                            RecipeTile(
+                                tile = tile,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onTileSelected(tile.action) }
+                            )
+                        }
+                        if (rowTiles.size == 1) {
+                            Box(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.buttery_wordmark),
+                    contentDescription = "Buttery",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .width(220.dp)
+                        .height(110.dp)
+                )
+                Text(
+                    text = "your personal kitchen dashboard",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    letterSpacing = 1.5.sp
+                )
+            }
         }
     }
 }

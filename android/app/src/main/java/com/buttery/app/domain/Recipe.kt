@@ -19,7 +19,10 @@ data class Recipe(
     val albumId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val visibility: RecipeVisibility = RecipeVisibility.Private,
+    val likeCount: Int = 0,
+    val publicPublishedAt: Long? = null
 )
 
 data class RecipeAlbum(
@@ -28,3 +31,14 @@ data class RecipeAlbum(
     val createdAt: Long,
     val customCoverImageUri: String?
 )
+
+enum class RecipeVisibility(val value: String) {
+    Private("private"),
+    Public("public"),
+    Shared("shared");
+
+    companion object {
+        fun from(value: String?): RecipeVisibility =
+            entries.firstOrNull { it.value.equals(value, ignoreCase = true) } ?: Private
+    }
+}

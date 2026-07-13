@@ -5,7 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,6 +66,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -76,11 +80,13 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.buttery.app.R
 import com.buttery.app.data.AccountResult
+import com.buttery.app.data.CommunityRecipe
 import com.buttery.app.data.RecipeShare
 import com.buttery.app.data.SharedRecipeSnapshot
 import com.buttery.app.data.UserProfile
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
+import com.buttery.app.ui.ButteryLayoutMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -94,7 +100,76 @@ private val AccountInk = Color(0xFF332D26)
 private enum class AuthMode { WELCOME, SIGN_UP, SIGN_IN }
 
 @Composable
+fun ProfileMenuScreen(
+    profile: UserProfile,
+    hasInboxNotification: Boolean,
+    onBack: () -> Unit,
+    onOpenMyProfile: () -> Unit,
+    onOpenInbox: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(Color(0xFF293A43), AccountNavy), radius = 1500f)
+        ).padding(horizontal = if (isPhone) 22.dp else 30.dp, vertical = if (isPhone) 56.dp else 30.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            color = AccountCream,
+            shape = RoundedCornerShape(28.dp),
+            shadowElevation = 18.dp,
+            modifier = Modifier.fillMaxWidth(if (isPhone) 0.96f else 0.58f)
+        ) {
+            Column(
+                Modifier.padding(if (isPhone) 22.dp else 30.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isPhone) 10.dp else 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ProfileAvatar(profile.profilePhotoUri, if (isPhone) 78 else 104)
+                Text(
+                    profile.displayName.ifBlank { profile.username },
+                    color = AccountInk,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = if (isPhone) 29.sp else 34.sp
+                )
+                ProfileMenuButton("@${profile.username}", Icons.Rounded.Person, onOpenMyProfile)
+                ProfileMenuButton(
+                    label = if (hasInboxNotification) "Inbox • New" else "Inbox",
+                    icon = Icons.Rounded.Inbox,
+                    onClick = onOpenInbox
+                )
+                ProfileMenuButton("Settings", Icons.Rounded.Settings, onOpenSettings)
+                ProfileMenuButton("Sign out", Icons.Rounded.Logout, onSignOut, danger = true)
+                TextButton(onClick = onBack) { Text("Back to dashboard", color = AccountNavy) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileMenuButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    danger: Boolean = false
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (danger) Color(0xFF6F3D39) else AccountButter
+        )
+    ) {
+        Icon(icon, null, tint = if (danger) Color.White else AccountNavy)
+        Text("  $label", color = if (danger) Color.White else AccountNavy, fontSize = 18.sp)
+    }
+}
+
+@Composable
 fun LoginScreen(
+    layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet,
     onSignUp: suspend (String, String, String, String) -> AccountResult,
     onSignIn: suspend (String, String) -> AccountResult,
     onGoogleSignIn: suspend () -> AccountResult,
@@ -112,6 +187,81 @@ fun LoginScreen(
         mutableStateOf<AccountResult.UsernameRequired?>(null)
     }
     val scope = rememberCoroutineScope()
+
+    if (layoutMode == ButteryLayoutMode.Phone) {
+        PhoneLoginScreenContent(
+            mode = mode,
+            onModeChange = { mode = it; message = null },
+            username = username,
+            onUsernameChange = { username = it },
+            displayName = displayName,
+            onDisplayNameChange = { displayName = it },
+            email = email,
+            onEmailChange = { email = it },
+            password = password,
+            onPasswordChange = { password = it },
+            message = message,
+            providerSignInRunning = providerSignInRunning,
+            emailSignInRunning = emailSignInRunning,
+            pendingGoogleAccount = pendingGoogleAccount,
+            onGoogleClick = {
+                if (!providerSignInRunning) {
+                    providerSignInRunning = true
+                    message = "Signing you in…"
+                    scope.launch {
+                        val result = onGoogleSignIn()
+                        when (result) {
+                            is AccountResult.UsernameRequired -> {
+                                pendingGoogleAccount = result
+                                displayName = result.displayName
+                                message = "Choose a username to finish Google sign-up."
+                            }
+                            is AccountResult.Error -> message = result.message
+                            is AccountResult.Success -> message = null
+                        }
+                        providerSignInRunning = false
+                    }
+                }
+            },
+            onEmailSubmit = {
+                if (!emailSignInRunning) {
+                    emailSignInRunning = true
+                    message = null
+                    scope.launch {
+                        val result = if (mode == AuthMode.SIGN_UP) {
+                            onSignUp(username, email, password, displayName)
+                        } else {
+                            onSignIn(email, password)
+                        }
+                        message = (result as? AccountResult.Error)?.message
+                        emailSignInRunning = false
+                    }
+                }
+            },
+            onCompleteGoogle = {
+                val pending = pendingGoogleAccount ?: return@PhoneLoginScreenContent
+                if (!providerSignInRunning) {
+                    providerSignInRunning = true
+                    message = "Finishing sign-up…"
+                    scope.launch {
+                        val result = onCompleteGoogleSignUp(
+                            pending.userId,
+                            pending.email,
+                            pending.displayName,
+                            username
+                        )
+                        message = when (result) {
+                            is AccountResult.Error -> result.message
+                            else -> null
+                        }
+                        if (result is AccountResult.Success) pendingGoogleAccount = null
+                        providerSignInRunning = false
+                    }
+                }
+            }
+        )
+        return
+    }
 
     Box(
         modifier = Modifier
@@ -277,6 +427,180 @@ fun LoginScreen(
 }
 
 @Composable
+private fun PhoneLoginScreenContent(
+    mode: AuthMode,
+    onModeChange: (AuthMode) -> Unit,
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    displayName: String,
+    onDisplayNameChange: (String) -> Unit,
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    message: String?,
+    providerSignInRunning: Boolean,
+    emailSignInRunning: Boolean,
+    pendingGoogleAccount: AccountResult.UsernameRequired?,
+    onGoogleClick: () -> Unit,
+    onEmailSubmit: () -> Unit,
+    onCompleteGoogle: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF15130F), AccountNavy, Color(0xFF293A43))
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(R.drawable.buttery_wordmark),
+                contentDescription = "Buttery",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth(0.78f)
+                    .heightIn(max = 150.dp)
+            )
+            Text(
+                "Glad to see you!",
+                color = AccountCream,
+                fontFamily = FontFamily.Serif,
+                fontSize = 34.sp
+            )
+            Text(
+                "Sign in to save, share, and discover recipes.",
+                color = AccountCream.copy(alpha = 0.78f),
+                fontSize = 16.sp
+            )
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = AccountCream,
+                shape = RoundedCornerShape(30.dp),
+                shadowElevation = 18.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        when {
+                            pendingGoogleAccount != null -> "Finish Google sign-up"
+                            mode == AuthMode.WELCOME -> "Choose how to continue"
+                            mode == AuthMode.SIGN_UP -> "Sign up with email"
+                            else -> "Log in with email"
+                        },
+                        color = AccountInk,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 28.sp
+                    )
+
+                    if (pendingGoogleAccount != null) {
+                        Text(
+                            "Choose a username so others can find your recipe book.",
+                            color = AccountInk.copy(alpha = 0.72f),
+                            fontSize = 15.sp
+                        )
+                        AccountField(username, onUsernameChange, "Username")
+                        Button(
+                            onClick = onCompleteGoogle,
+                            enabled = !providerSignInRunning,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                        ) {
+                            if (providerSignInRunning) {
+                                CircularProgressIndicator(
+                                    color = AccountNavy,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text("  Finishing…", color = AccountNavy)
+                            } else {
+                                Text("Finish Google sign-up", color = AccountNavy)
+                            }
+                        }
+                    } else if (mode == AuthMode.WELCOME) {
+                        ProviderButton(if (providerSignInRunning) "Signing you in…" else "Continue with Google") {
+                            onGoogleClick()
+                        }
+                        Button(
+                            onClick = { onModeChange(AuthMode.SIGN_UP) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                        ) {
+                            Icon(Icons.Rounded.Person, null, tint = AccountNavy)
+                            Text("  Sign up with email", color = AccountNavy)
+                        }
+                        TextButton(
+                            onClick = { onModeChange(AuthMode.SIGN_IN) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Log in with email", color = AccountNavy)
+                        }
+                    } else {
+                        if (mode == AuthMode.SIGN_UP) {
+                            AccountField(username, onUsernameChange, "Username")
+                            AccountField(displayName, onDisplayNameChange, "Display name (optional)")
+                        }
+                        AccountField(email, onEmailChange, "Email")
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = onPasswordChange,
+                            label = { Text("Password") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = onEmailSubmit,
+                            enabled = !emailSignInRunning,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                        ) {
+                            if (emailSignInRunning) {
+                                CircularProgressIndicator(
+                                    color = AccountNavy,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text("  Working…", color = AccountNavy)
+                            } else {
+                                Text(if (mode == AuthMode.SIGN_UP) "Create account" else "Log in", color = AccountNavy)
+                            }
+                        }
+                        TextButton(onClick = { onModeChange(AuthMode.WELCOME) }) {
+                            Text("Back to all sign-in options", color = AccountNavy)
+                        }
+                    }
+
+                    message?.let {
+                        Text(
+                            it,
+                            color = if (it.contains("Signing", ignoreCase = true) || it.contains("Finishing", ignoreCase = true)) {
+                                AccountInk.copy(alpha = 0.7f)
+                            } else {
+                                Color(0xFF9B493D)
+                            },
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProviderButton(label: String, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
@@ -303,6 +627,7 @@ fun ProfileScreen(
     profile: UserProfile,
     inbox: List<RecipeShare>,
     onBack: () -> Unit,
+    onOpenPublicProfile: (String) -> Unit,
     onSaveProfile: suspend (String, String?) -> AccountResult,
     onSignOut: () -> Unit,
     onViewShare: (RecipeShare) -> Unit,
@@ -375,6 +700,14 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         ProfileAvatar(photoUri, 112)
+                        Button(
+                            onClick = { onOpenPublicProfile(profile.userId) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                        ) {
+                            Icon(Icons.Rounded.Person, null, tint = AccountNavy)
+                            Text("  View @${profile.username}", color = AccountNavy)
+                        }
                         OutlinedButton(
                             onClick = { picker.launch("image/*") },
                             enabled = !savingProfile
@@ -462,7 +795,14 @@ fun ProfileScreen(
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(inbox, key = { it.shareId }) { share ->
-                                    InboxCard(share, onViewShare, onAddShare, onDismissShare)
+                                    InboxCard(
+                                        share = share,
+                                        isPhone = false,
+                                        onView = onViewShare,
+                                        onAdd = onAddShare,
+                                        onDismiss = onDismissShare,
+                                        onOpenSenderProfile = { onOpenPublicProfile(share.fromUserId) }
+                                    )
                                 }
                             }
                         }
@@ -474,19 +814,271 @@ fun ProfileScreen(
 }
 
 @Composable
+fun SettingsScreen(
+    profile: UserProfile,
+    onBack: () -> Unit,
+    onOpenPublicProfile: (String) -> Unit,
+    onSaveProfile: suspend (String, String?) -> AccountResult,
+    onSignOut: () -> Unit
+) {
+    var displayName by remember(profile.userId, profile.displayName) { mutableStateOf(profile.displayName) }
+    var photoUri by remember(profile.userId, profile.profilePhotoUri) { mutableStateOf(profile.profilePhotoUri) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var savingProfile by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            photoUri = runCatching {
+                val destination = File(context.filesDir, "profile_${profile.userId}_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(it).use { input ->
+                    requireNotNull(input) { "Could not open selected photo." }
+                    destination.outputStream().use(input::copyTo)
+                }
+                Uri.fromFile(destination).toString()
+            }.getOrElse {
+                message = "That photo could not be saved. Please choose another image."
+                null
+            }
+        }
+    }
+
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(Color(0xFF293A43), AccountNavy), radius = 1500f)
+        ).padding(26.dp)
+    ) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = AccountPanel)) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, null)
+                    Text("  Menu")
+                }
+                Text(
+                    "Settings",
+                    color = AccountCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 38.sp,
+                    modifier = Modifier.padding(start = 20.dp)
+                )
+                Spacer(Modifier.weight(1f))
+                Button(onClick = onSignOut, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))) {
+                    Icon(Icons.Rounded.Logout, null)
+                    Text("  Sign out")
+                }
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.62f).fillMaxHeight().align(Alignment.CenterHorizontally),
+                color = AccountCream,
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Column(
+                    Modifier.padding(30.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    ProfileAvatar(photoUri, 122)
+                    Button(
+                        onClick = { onOpenPublicProfile(profile.userId) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                    ) {
+                        Icon(Icons.Rounded.Person, null, tint = AccountNavy)
+                        Text("  View @${profile.username}", color = AccountNavy)
+                    }
+                    OutlinedButton(onClick = { picker.launch("image/*") }, enabled = !savingProfile) {
+                        Icon(Icons.Rounded.Image, null)
+                        Text("  Change photo")
+                    }
+                    OutlinedTextField(
+                        value = profile.username,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Username") },
+                        leadingIcon = { Icon(Icons.Rounded.Person, null) },
+                        supportingText = { Text("Usernames cannot be changed.") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    AccountField(displayName, { displayName = it }, "Display name")
+                    OutlinedTextField(
+                        value = profile.email,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Email") },
+                        leadingIcon = { Icon(Icons.Rounded.Email, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = {
+                            if (!savingProfile) {
+                                savingProfile = true
+                                message = null
+                                scope.launch {
+                                    message = when (val result = onSaveProfile(displayName, photoUri)) {
+                                        is AccountResult.Success -> "Profile saved."
+                                        is AccountResult.UsernameRequired -> "Choose a username to continue."
+                                        is AccountResult.Error -> result.message
+                                    }
+                                    savingProfile = false
+                                }
+                            }
+                        },
+                        enabled = !savingProfile,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+                    ) {
+                        if (savingProfile) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp, color = AccountNavy)
+                            Text("  Saving…", color = AccountNavy)
+                        } else {
+                            Text("Save profile", color = AccountNavy)
+                        }
+                    }
+                    message?.let { Text(it, color = AccountInk) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun InboxScreen(
+    inbox: List<RecipeShare>,
+    onBack: () -> Unit,
+    onViewShare: (RecipeShare) -> Unit,
+    onAddShare: (RecipeShare) -> Unit,
+    onDismissShare: (RecipeShare) -> Unit,
+    onOpenPublicProfile: (String) -> Unit
+) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(Color(0xFF293A43), AccountNavy), radius = 1500f)
+        ).padding(
+            start = if (isPhone) 18.dp else 26.dp,
+            end = if (isPhone) 18.dp else 26.dp,
+            top = if (isPhone) 54.dp else 26.dp,
+            bottom = if (isPhone) 18.dp else 26.dp
+        )
+    ) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(if (isPhone) 14.dp else 18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = AccountPanel)) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, null)
+                    Text(if (isPhone) "" else "  Menu")
+                }
+                Text(
+                    "Inbox",
+                    color = AccountCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = if (isPhone) 34.sp else 38.sp,
+                    modifier = Modifier.padding(start = 20.dp)
+                )
+                Spacer(Modifier.weight(1f))
+                Text("${inbox.size} received", color = AccountCream.copy(alpha = 0.72f), fontSize = if (isPhone) 14.sp else 18.sp)
+            }
+            Surface(modifier = Modifier.fillMaxSize(), color = AccountCream, shape = RoundedCornerShape(22.dp)) {
+                if (inbox.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Shared recipes will appear here.", color = AccountInk.copy(alpha = 0.55f))
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.padding(if (isPhone) 14.dp else 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(inbox, key = { it.shareId }) { share ->
+                            InboxCard(
+                                share = share,
+                                isPhone = isPhone,
+                                onView = onViewShare,
+                                onAdd = onAddShare,
+                                onDismiss = onDismissShare,
+                                onOpenSenderProfile = { onOpenPublicProfile(share.fromUserId) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun InboxCard(
     share: RecipeShare,
+    isPhone: Boolean,
     onView: (RecipeShare) -> Unit,
     onAdd: (RecipeShare) -> Unit,
-    onDismiss: (RecipeShare) -> Unit
+    onDismiss: (RecipeShare) -> Unit,
+    onOpenSenderProfile: () -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.72f))) {
+        if (isPhone) {
+            Column(
+                Modifier.fillMaxWidth().padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(modifier = Modifier.clickable(onClick = onOpenSenderProfile)) {
+                        ProfileAvatar(share.fromProfilePhotoUri, 44)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (share.status == "pending") {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .size(10.dp)
+                                        .background(Color(0xFFD7433B), CircleShape)
+                                )
+                            }
+                            Text(
+                                "${share.fromUsername} shared ${share.recipe.title} with you",
+                                color = AccountInk,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2
+                            )
+                        }
+                        if (share.status == "added") Text("Added to your recipes", color = Color(0xFF687A48), fontSize = 13.sp)
+                    }
+                    IconButton(onClick = { onDismiss(share) }) {
+                        Icon(Icons.Rounded.Close, "Dismiss")
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { onView(share) }, modifier = Modifier.weight(1f)) { Text("View") }
+                    Button(
+                        onClick = { onAdd(share) },
+                        enabled = share.status != "added",
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccountButter,
+                            disabledContainerColor = Color(0xFFB7B2A8),
+                            disabledContentColor = Color(0xFFEFECE3)
+                        )
+                    ) {
+                        Text(
+                            if (share.status == "added") "Added" else "Add",
+                            color = if (share.status == "added") Color(0xFFEFECE3) else AccountNavy
+                        )
+                    }
+                }
+            }
+            return@Card
+        }
         Row(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(Icons.Rounded.Share, null, tint = Color(0xFF687A48))
+            Box(modifier = Modifier.clickable(onClick = onOpenSenderProfile)) {
+                ProfileAvatar(share.fromProfilePhotoUri, 46)
+            }
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (share.status == "pending") {
@@ -675,6 +1267,98 @@ fun ShareRecipeDialog(
 }
 
 @Composable
+fun ShareCommunityRecipeDialog(
+    recipe: CommunityRecipe,
+    findUser: suspend (String) -> UserProfile?,
+    matchingUsernames: suspend (String) -> List<String>,
+    onShare: suspend (UserProfile) -> Result<Unit>,
+    onDismiss: () -> Unit
+) {
+    var username by remember { mutableStateOf("") }
+    var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var shared by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(username) {
+        val clean = username.trim()
+        if (clean.length < 2) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(220)
+        suggestions = runCatching { matchingUsernames(clean) }.getOrDefault(emptyList())
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Share ${recipe.title}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AccountField(username, {
+                    username = it
+                    message = null
+                    shared = false
+                }, "Recipient username")
+                suggestions.takeIf { it.isNotEmpty() }?.let { matches ->
+                    Surface(
+                        color = Color.White.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            matches.forEach { suggestion ->
+                                TextButton(
+                                    onClick = {
+                                        username = suggestion
+                                        suggestions = emptyList()
+                                        message = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("@$suggestion", color = AccountInk)
+                                }
+                            }
+                        }
+                    }
+                }
+                message?.let {
+                    Text(it, color = if (shared) Color(0xFF4F7A43) else Color(0xFF9B493D))
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (!loading) {
+                        loading = true
+                        scope.launch {
+                            val recipient = runCatching { findUser(username) }.getOrNull()
+                            message = if (recipient == null) {
+                                "No user found with that username."
+                            } else {
+                                onShare(recipient).fold(
+                                    onSuccess = {
+                                        shared = true
+                                        "Recipe shared with ${recipient.username}"
+                                    },
+                                    onFailure = { it.message ?: "Could not share recipe." }
+                                )
+                            }
+                            loading = false
+                        }
+                    }
+                },
+                enabled = !loading && !shared,
+                colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
+            ) { Text(if (loading) "Sharing…" else "Share", color = AccountNavy) }
+        }
+    )
+}
+
+@Composable
 fun SharedRecipePreviewScreen(
     share: RecipeShare,
     senderProfile: UserProfile?,
@@ -682,6 +1366,80 @@ fun SharedRecipePreviewScreen(
     onAdd: () -> Unit
 ) {
     val recipe = share.recipe
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    if (isPhone) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(AccountNavy)
+                .padding(start = 18.dp, end = 18.dp, top = 54.dp, bottom = 18.dp)
+        ) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(46.dp).background(AccountPanel, CircleShape)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = AccountCream)
+                    }
+                    Row(
+                        modifier = Modifier.padding(start = 12.dp).weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        ProfileAvatar(senderProfile?.profilePhotoUri ?: share.fromProfilePhotoUri, 38)
+                        Column {
+                            Text(
+                                senderProfile?.displayName?.ifBlank { share.fromDisplayName }
+                                    ?: share.fromDisplayName.ifBlank { share.fromUsername },
+                                color = AccountCream,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                maxLines = 1
+                            )
+                            Text("@${share.fromUsername}", color = AccountCream.copy(alpha = 0.68f), fontSize = 12.sp)
+                        }
+                    }
+                    Button(
+                        onClick = onAdd,
+                        enabled = share.status != "added",
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccountButter,
+                            disabledContainerColor = Color(0xFFB7B2A8),
+                            disabledContentColor = Color(0xFFEFECE3)
+                        )
+                    ) {
+                        Text(if (share.status == "added") "Added" else "Add", color = if (share.status == "added") Color(0xFFEFECE3) else AccountNavy)
+                    }
+                }
+                if (recipe.photoUris.isNotEmpty()) {
+                    SharedPhotoGallery(recipe.photoUris)
+                }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(26.dp),
+                    color = AccountCream
+                ) {
+                    LazyColumn(
+                        Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Text(recipe.title, color = AccountInk, fontFamily = FontFamily.Serif, fontSize = 34.sp, lineHeight = 38.sp)
+                            Text("Shared by ${share.fromUsername}", color = Color(0xFF745B33))
+                        }
+                        item { SnapshotSection("Ingredients", recipe.ingredients) }
+                        item { SnapshotSection("Instructions", recipe.instructions) }
+                        if (recipe.notes.isNotBlank()) item { SnapshotSection("Notes", recipe.notes) }
+                        recipe.videoUri?.let { videoUri ->
+                            item { SharedRecipeVideo(videoUri) }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     Box(
         Modifier.fillMaxSize().background(AccountNavy).padding(26.dp)
     ) {
@@ -766,14 +1524,30 @@ private fun SharedPhotoGallery(photoUris: List<String>) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         photoUris.forEach { photoUri ->
-            AsyncImage(
-                model = photoUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(R.drawable.ambient_extra_02),
-                error = painterResource(R.drawable.ambient_extra_02),
-                modifier = Modifier.size(300.dp, 184.dp).clip(RoundedCornerShape(16.dp))
-            )
+            Box(
+                modifier = Modifier
+                    .size(300.dp, 184.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF6A5D4D), Color(0xFF221E18), Color.Black)
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Image,
+                    contentDescription = null,
+                    tint = AccountButter.copy(alpha = 0.74f),
+                    modifier = Modifier.size(52.dp)
+                )
+                AsyncImage(
+                    model = photoUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }

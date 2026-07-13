@@ -33,6 +33,10 @@ object RecipeParser {
     private val socialClutter = Regex(
         """(?i)^\s*(like|share|follow|comment|save this recipe|full recipe below|join my group)(\s+.*)?$"""
     )
+    private val assistantClutter = Regex(
+        """(?i)^\s*(absolutely!?|sure!?|of course!?|here'?s|here is|i think you'?re going to love|let me know|enjoy!?)(\s+.*)?$"""
+    )
+    private val decorativeClutter = Regex("""^\s*[-–—*_]{2,}\s*$""")
     private val hashtagOnly = Regex("""^\s*(#[\p{L}\p{N}_-]+\s*)+$""")
     private val emojiOnly = Regex("""^[\s\p{So}\p{Sk}]+$""")
 
@@ -90,7 +94,7 @@ object RecipeParser {
         return ParsedRecipe(
             title = title,
             ingredients = ingredients.joinToString("\n"),
-            instructions = instructions.joinToString("\n"),
+            instructions = formatInstructions(instructions),
             prepTime = prepTime,
             cookTime = cookTime,
             totalTime = totalTime,
@@ -118,13 +122,24 @@ object RecipeParser {
             notesHeading.matches(line)
 
     private fun isClutter(line: String) =
-        socialClutter.matches(line) || hashtagOnly.matches(line) || emojiOnly.matches(line)
+        socialClutter.matches(line) ||
+            assistantClutter.matches(line) ||
+            hashtagOnly.matches(line) ||
+            emojiOnly.matches(line) ||
+            decorativeClutter.matches(line)
 
     private fun isSafeRecipeLine(line: String) =
         line.length <= 500 && !isClutter(line)
 
     private fun cleanListMarker(line: String) =
         line.replace(Regex("""(?i)^\s*((step\s*)?\d+[.):]|[-*•])\s*"""), "").trim()
+
+    private fun formatInstructions(instructions: List<String>): String =
+        instructions
+            .map { cleanListMarker(it) }
+            .filter { it.isNotBlank() && !isClutter(it) }
+            .mapIndexed { index, step -> "${index + 1}. $step" }
+            .joinToString("\n\n")
 
     private enum class Section { Unknown, Ingredients, Instructions, Notes }
 }

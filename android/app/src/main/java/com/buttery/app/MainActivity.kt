@@ -8,14 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.buttery.app.ui.RecipeTabletApp
+import com.buttery.app.ui.ButteryAndroidApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            RecipeTabletApp()
+            ButteryAndroidApp()
         }
 
         window.decorView.post {

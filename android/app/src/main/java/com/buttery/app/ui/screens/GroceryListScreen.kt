@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
@@ -104,6 +105,7 @@ fun GroceryListScreen(
     store: GroceryListStore,
     onHome: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     val initialState = remember(store) { store.load() }
     var mode by remember { mutableStateOf(initialState.mode) }
     var typedText by remember { mutableStateOf(initialState.typedText) }
@@ -141,11 +143,16 @@ fun GroceryListScreen(
                     radius = 1_500f
                 )
             )
-            .padding(horizontal = 30.dp, vertical = 22.dp)
+            .padding(
+                start = if (isPhone) 18.dp else 30.dp,
+                end = if (isPhone) 18.dp else 30.dp,
+                top = if (isPhone) 56.dp else 22.dp,
+                bottom = if (isPhone) 18.dp else 22.dp
+            )
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 16.dp)
         ) {
             GroceryHeader(
                 mode = mode,
@@ -160,7 +167,49 @@ fun GroceryListScreen(
                 color = GroceryCream,
                 shadowElevation = 14.dp
             ) {
-                Row(modifier = Modifier.fillMaxSize()) {
+                if (isPhone && mode == GroceryListMode.DRAW) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        DrawingToolbar(
+                            inkChoice = inkChoice,
+                            onInkSelected = { inkChoice = it },
+                            strokeChoice = strokeChoice,
+                            onStrokeSelected = { strokeChoice = it },
+                            canUndo = strokes.isNotEmpty(),
+                            canRedo = redoStrokes.isNotEmpty(),
+                            onUndo = {
+                                if (strokes.isNotEmpty()) {
+                                    redoStrokes += strokes.removeAt(strokes.lastIndex)
+                                    persist()
+                                }
+                            },
+                            onRedo = {
+                                if (redoStrokes.isNotEmpty()) {
+                                    strokes += redoStrokes.removeAt(redoStrokes.lastIndex)
+                                    persist()
+                                }
+                            },
+                            compact = true
+                        )
+                        LinedPaper(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            mode = mode,
+                            typedText = typedText,
+                            onTypedTextChanged = { value ->
+                                typedText = value
+                                persist(savedTypedText = value)
+                            },
+                            strokes = strokes,
+                            color = inkChoice,
+                            strokeSize = strokeChoice,
+                            onStrokeFinished = { stroke ->
+                                strokes += stroke
+                                redoStrokes.clear()
+                                persist()
+                            }
+                        )
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxSize()) {
                     if (mode == GroceryListMode.DRAW) {
                         DrawingToolbar(
                             inkChoice = inkChoice,
@@ -200,6 +249,7 @@ fun GroceryListScreen(
                             persist()
                         }
                     )
+                    }
                 }
             }
         }
@@ -253,6 +303,54 @@ private fun GroceryHeader(
     onHome: () -> Unit,
     onClear: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    if (isPhone) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onHome,
+                    modifier = Modifier.heightIn(min = 46.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GroceryNavyPanel)
+                ) {
+                    Icon(Icons.Rounded.Home, contentDescription = null)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Grocery List", color = GroceryCream, fontFamily = FontFamily.Serif, fontSize = 32.sp)
+                    Text(
+                        if (mode == GroceryListMode.TYPE) "Typed notebook" else "Handwritten notebook",
+                        color = Color(0xFFC2C8C5),
+                        fontSize = 13.sp
+                    )
+                }
+                Button(
+                    onClick = onClear,
+                    modifier = Modifier.heightIn(min = 46.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))
+                ) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null)
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeChip(
+                    text = "Type",
+                    selected = mode == GroceryListMode.TYPE,
+                    onClick = { onModeSelected(GroceryListMode.TYPE) },
+                    modifier = Modifier.weight(1f)
+                )
+                ModeChip(
+                    text = "Draw",
+                    selected = mode == GroceryListMode.DRAW,
+                    onClick = { onModeSelected(GroceryListMode.DRAW) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        return
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -303,10 +401,11 @@ private fun GroceryHeader(
 }
 
 @Composable
-private fun ModeChip(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun ModeChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     FilterChip(
         selected = selected,
         onClick = onClick,
+        modifier = modifier,
         label = { Text(text, fontSize = 17.sp, modifier = Modifier.padding(vertical = 7.dp)) },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = GroceryNavyPanel,
@@ -332,15 +431,19 @@ private fun DrawingToolbar(
     canUndo: Boolean,
     canRedo: Boolean,
     onUndo: () -> Unit,
-    onRedo: () -> Unit
+    onRedo: () -> Unit,
+    compact: Boolean = false
 ) {
+    val toolbarModifier = if (compact) {
+        Modifier.fillMaxWidth()
+    } else {
+        Modifier.width(174.dp).fillMaxHeight()
+    }
     Column(
-        modifier = Modifier
-            .width(174.dp)
-            .fillMaxHeight()
+        modifier = toolbarModifier
             .background(Color(0xFFE8DECA))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(if (compact) 10.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)
     ) {
         Text("TOOLS", color = GroceryInk.copy(alpha = 0.64f), fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
