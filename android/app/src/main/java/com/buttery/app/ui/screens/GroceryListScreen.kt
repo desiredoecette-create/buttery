@@ -58,6 +58,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.buttery.app.data.GroceryListMode
@@ -162,7 +163,7 @@ fun GroceryListScreen(
             )
 
             Surface(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 color = GroceryCream,
                 shadowElevation = 14.dp
@@ -306,32 +307,53 @@ private fun GroceryHeader(
     val isPhone = LocalConfiguration.current.screenWidthDp < 700
     if (isPhone) {
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = onHome,
-                    modifier = Modifier.heightIn(min = 46.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GroceryNavyPanel)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 76.dp)
+                        .align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Rounded.Home, contentDescription = null)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Grocery List", color = GroceryCream, fontFamily = FontFamily.Serif, fontSize = 32.sp)
+                    Text(
+                        "Grocery List",
+                        color = GroceryCream,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 28.sp,
+                        textAlign = TextAlign.Center
+                    )
                     Text(
                         if (mode == GroceryListMode.TYPE) "Typed notebook" else "Handwritten notebook",
                         color = Color(0xFFC2C8C5),
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Button(
+                    onClick = onHome,
+                    modifier = Modifier
+                        .heightIn(min = 46.dp)
+                        .align(Alignment.CenterStart),
+                    colors = ButtonDefaults.buttonColors(containerColor = GroceryNavyPanel)
+                ) {
+                    Icon(
+                        Icons.Rounded.Home,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Button(
                     onClick = onClear,
-                    modifier = Modifier.heightIn(min = 46.dp),
+                    modifier = Modifier
+                        .heightIn(min = 46.dp)
+                        .align(Alignment.CenterEnd),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))
                 ) {
-                    Icon(Icons.Rounded.Delete, contentDescription = null)
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -406,7 +428,14 @@ private fun ModeChip(text: String, selected: Boolean, onClick: () -> Unit, modif
         selected = selected,
         onClick = onClick,
         modifier = modifier,
-        label = { Text(text, fontSize = 17.sp, modifier = Modifier.padding(vertical = 7.dp)) },
+        label = {
+            Text(
+                text = text,
+                fontSize = 17.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp)
+            )
+        },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = GroceryNavyPanel,
             labelColor = GroceryCream,
@@ -434,11 +463,20 @@ private fun DrawingToolbar(
     onRedo: () -> Unit,
     compact: Boolean = false
 ) {
-    val toolbarModifier = if (compact) {
-        Modifier.fillMaxWidth()
-    } else {
-        Modifier.width(174.dp).fillMaxHeight()
+    if (compact) {
+        CompactDrawingToolbar(
+            inkChoice = inkChoice,
+            onInkSelected = onInkSelected,
+            strokeChoice = strokeChoice,
+            onStrokeSelected = onStrokeSelected,
+            canUndo = canUndo,
+            canRedo = canRedo,
+            onUndo = onUndo,
+            onRedo = onRedo
+        )
+        return
     }
+    val toolbarModifier = Modifier.width(174.dp).fillMaxHeight()
     Column(
         modifier = toolbarModifier
             .background(Color(0xFFE8DECA))
@@ -508,6 +546,108 @@ private fun DrawingToolbar(
             ) {
                 Icon(Icons.Rounded.Redo, "Redo")
                 Text("  Redo")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactDrawingToolbar(
+    inkChoice: InkChoice,
+    onInkSelected: (InkChoice) -> Unit,
+    strokeChoice: StrokeChoice,
+    onStrokeSelected: (StrokeChoice) -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFE8DECA))
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(GroceryButter, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Edit,
+                    contentDescription = "Pen",
+                    modifier = Modifier.size(18.dp),
+                    tint = GroceryInk
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                InkChoices.forEach { choice ->
+                    IconButton(
+                        onClick = { onInkSelected(choice) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(choice.color, CircleShape)
+                                .then(
+                                    if (inkChoice == choice) {
+                                        Modifier.border(1.5.dp, GroceryInk, CircleShape)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconButton(
+                    onClick = onUndo,
+                    enabled = canUndo,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
+                ) {
+                    Icon(Icons.Rounded.Undo, "Undo", modifier = Modifier.size(18.dp))
+                }
+                IconButton(
+                    onClick = onRedo,
+                    enabled = canRedo,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
+                ) {
+                    Icon(Icons.Rounded.Redo, "Redo", modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            StrokeChoices.forEach { choice ->
+                FilterChip(
+                    selected = strokeChoice == choice,
+                    onClick = { onStrokeSelected(choice) },
+                    label = { Text(choice.label, fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f).heightIn(min = 32.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = GrocerySage,
+                        selectedLabelColor = Color.White
+                    )
+                )
             }
         }
     }

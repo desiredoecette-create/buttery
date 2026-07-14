@@ -83,6 +83,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -137,6 +138,7 @@ fun AllAlbumsScreen(
         BrowseTopBar(
             title = "Your Recipe Albums",
             subtitle = "Select an album to explore",
+            centerPhoneHeading = true,
             search = search,
             searchHint = "Search albums or recipes…",
             onSearchChange = { search = it },
@@ -335,7 +337,9 @@ fun FavoritesScreen(
             searchHint = "Search favorites…",
             onSearchChange = { search = it },
             onHome = onHome,
-            onBack = onBrowseRecipes
+            onBack = onBrowseRecipes,
+            centerPhoneHeading = true,
+            phoneTopOffsetFraction = 0.08f
         )
 
         when {
@@ -451,33 +455,71 @@ private fun BrowseTopBar(
     searchHint: String,
     onSearchChange: (String) -> Unit,
     onHome: () -> Unit,
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
+    centerPhoneHeading: Boolean = false,
+    phoneTopOffsetFraction: Float = 0f
 ) {
-    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    val configuration = LocalConfiguration.current
+    val isPhone = configuration.screenWidthDp < 700
+    val phoneTopOffset = (configuration.screenHeightDp * phoneTopOffsetFraction).dp
     if (isPhone) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = phoneTopOffset),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (onBack != null) {
-                    RoundBrowseButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to All Albums", onBack)
-                }
-                RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        title,
-                        color = BrowseCream,
-                        fontFamily = FontFamily.Serif,
-                        fontSize = 31.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+            if (centerPhoneHeading) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    RoundBrowseButton(
+                        icon = Icons.Rounded.Home,
+                        description = "Home",
+                        onClick = onHome
                     )
-                    Text(subtitle, color = BrowseMuted, fontSize = 14.sp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 60.dp)
+                            .align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            title,
+                            color = BrowseCream,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 26.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            subtitle,
+                            color = BrowseMuted,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onBack != null) {
+                        RoundBrowseButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to All Albums", onBack)
+                    }
+                    RoundBrowseButton(Icons.Rounded.Home, "Home", onHome)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            title,
+                            color = BrowseCream,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 31.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(subtitle, color = BrowseMuted, fontSize = 14.sp)
+                    }
                 }
             }
             BrowseSearchField(

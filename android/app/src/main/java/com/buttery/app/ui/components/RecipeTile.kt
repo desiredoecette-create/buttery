@@ -74,6 +74,7 @@ fun RecipeTile(
     modifier: Modifier = Modifier
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    val isDetailedPhoneTile = isPhone && tile.eyebrow != null
     Surface(
         modifier = modifier
             .aspectRatio(1.58f)
@@ -126,10 +127,16 @@ fun RecipeTile(
                     )
             )
             Surface(
-                modifier = Modifier
-                    .align(if (isPhone) Alignment.Center else Alignment.Center)
-                    .padding(bottom = if (isPhone) 18.dp else 0.dp)
-                    .size(if (isPhone) 48.dp else 58.dp),
+                modifier = if (isDetailedPhoneTile) {
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp)
+                } else {
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(bottom = if (isPhone) 18.dp else 0.dp)
+                        .size(if (isPhone) 48.dp else 58.dp)
+                },
                 shape = RoundedCornerShape(50),
                 color = Color.Black.copy(alpha = 0.4f),
                 border = BorderStroke(1.dp, Color(0xFFF4EFE6).copy(alpha = 0.78f))
@@ -138,14 +145,21 @@ fun RecipeTile(
                     imageVector = tile.icon.imageVector(),
                     contentDescription = null,
                     tint = Color(0xFFF4EFE6),
-                    modifier = Modifier.padding(if (isPhone) 12.dp else 14.dp)
+                    modifier = Modifier.padding(
+                        if (isPhone) 12.dp else 14.dp
+                    )
                 )
             }
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = if (isPhone) 8.dp else 12.dp, vertical = if (isPhone) 9.dp else 13.dp),
+                    .padding(
+                        start = if (isPhone) 8.dp else 12.dp,
+                        end = if (isDetailedPhoneTile) 42.dp else if (isPhone) 8.dp else 12.dp,
+                        top = if (isPhone) 7.dp else 13.dp,
+                        bottom = if (isPhone) 7.dp else 13.dp
+                    ),
                 horizontalAlignment = if (tile.eyebrow == null) {
                     Alignment.CenterHorizontally
                 } else {
@@ -156,25 +170,38 @@ fun RecipeTile(
                     Text(
                         text = it,
                         color = Color(0xFFFFC857),
-                        fontSize = if (isPhone) 10.sp else 12.sp,
+                        fontSize = if (isDetailedPhoneTile) 8.sp else if (isPhone) 10.sp else 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
                     text = tile.title,
                     color = Color(0xFFF4EFE6),
-                    fontSize = if (isPhone) 16.sp else 19.sp,
+                    fontSize = if (isDetailedPhoneTile) 14.sp else if (isPhone) 16.sp else 19.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
-                    lineHeight = if (isPhone) 18.sp else 22.sp,
+                    lineHeight = if (isDetailedPhoneTile) 15.sp else if (isPhone) 18.sp else 22.sp,
                     textAlign = if (tile.eyebrow == null) TextAlign.Center else TextAlign.Start,
                     overflow = TextOverflow.Ellipsis
                 )
                 tile.subtitle?.let {
-                    Text(it, color = Color(0xFFF4EFE6).copy(alpha = 0.8f), fontSize = if (isPhone) 11.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        it,
+                        color = Color(0xFFF4EFE6).copy(alpha = 0.8f),
+                        fontSize = if (isDetailedPhoneTile) 9.sp else if (isPhone) 11.sp else 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 tile.footer?.let {
-                    Text(it, color = Color(0xFFFFC857), fontSize = if (isPhone) 10.sp else 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        it,
+                        color = Color(0xFFFFC857),
+                        fontSize = if (isDetailedPhoneTile) 8.sp else if (isPhone) 10.sp else 12.sp,
+                        lineHeight = if (isDetailedPhoneTile) 9.sp else if (isPhone) 12.sp else 14.sp,
+                        maxLines = if (isDetailedPhoneTile) 2 else 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

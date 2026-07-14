@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Restaurant
@@ -19,7 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -28,6 +31,13 @@ fun ContinueRecipeEmptyScreen(
     onBrowseRecipes: () -> Unit,
     onAddRecipe: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    val contentModifier = if (isPhone) {
+        Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+    } else {
+        Modifier
+    }
+    val centeredTextModifier = if (isPhone) Modifier.fillMaxWidth() else Modifier
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -40,6 +50,7 @@ fun ContinueRecipeEmptyScreen(
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = contentModifier,
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
@@ -52,22 +63,43 @@ fun ContinueRecipeEmptyScreen(
                 "No recipe in progress yet.",
                 color = Color(0xFFF4EFE6),
                 fontFamily = FontFamily.Serif,
-                fontSize = 34.sp
+                fontSize = 34.sp,
+                textAlign = TextAlign.Center,
+                modifier = centeredTextModifier
             )
             Text(
                 "Open a recipe and Buttery will remember it here.",
                 color = Color(0xFFF4EFE6).copy(alpha = 0.72f),
-                fontSize = 17.sp
+                fontSize = 17.sp,
+                textAlign = TextAlign.Center,
+                modifier = centeredTextModifier
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                OutlinedButton(onClick = onBrowseRecipes) {
-                    Text("Browse Recipes", modifier = Modifier.padding(8.dp))
-                }
-                Button(
-                    onClick = onAddRecipe,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB96F3C))
+            if (isPhone) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Add Your First Recipe", modifier = Modifier.padding(8.dp))
+                    OutlinedButton(onClick = onBrowseRecipes) {
+                        Text("Browse Recipes", modifier = Modifier.padding(8.dp))
+                    }
+                    Button(
+                        onClick = onAddRecipe,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB96F3C))
+                    ) {
+                        Text("Add Your First Recipe", modifier = Modifier.padding(8.dp))
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    OutlinedButton(onClick = onBrowseRecipes) {
+                        Text("Browse Recipes", modifier = Modifier.padding(8.dp))
+                    }
+                    Button(
+                        onClick = onAddRecipe,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB96F3C))
+                    ) {
+                        Text("Add Your First Recipe", modifier = Modifier.padding(8.dp))
+                    }
                 }
             }
         }

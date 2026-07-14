@@ -29,6 +29,9 @@ interface RecipeAlbumDao {
     @Query("DELETE FROM recipe_albums WHERE id = :id AND ownerId = :ownerId")
     suspend fun deleteById(id: Long, ownerId: String)
 
+    @Query("DELETE FROM recipe_albums WHERE ownerId = :ownerId")
+    suspend fun deleteByOwner(ownerId: String)
+
     @Transaction
     suspend fun moveRecipesAndDelete(ownerId: String, albumId: Long, destinationAlbumId: Long?) {
         moveRecipes(ownerId, albumId, destinationAlbumId, System.currentTimeMillis())

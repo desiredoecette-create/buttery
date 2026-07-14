@@ -85,7 +85,11 @@ fun NewRecipeScreen(
     onCreateManually: () -> Unit,
     onImportRecipe: () -> Unit
 ) {
-    RecipePage(title = "Add a new recipe", onBack = onBack) {
+    RecipePage(
+        title = "Add a new recipe",
+        onBack = onBack,
+        phoneVerticalOffsetFraction = 0.07f
+    ) {
         val isPhone = LocalConfiguration.current.screenWidthDp < 700
         Text("Choose how you would like to begin.", color = Ink.copy(alpha = 0.7f), fontSize = 19.sp)
         if (isPhone) {
@@ -1124,9 +1128,12 @@ private fun RecipePage(
     title: String,
     onBack: () -> Unit,
     scrollable: Boolean = false,
+    phoneVerticalOffsetFraction: Float = 0f,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val isPhone = LocalConfiguration.current.screenWidthDp < 700
+    val configuration = LocalConfiguration.current
+    val isPhone = configuration.screenWidthDp < 700
+    val phoneVerticalOffset = (configuration.screenHeightDp * phoneVerticalOffsetFraction).dp
     val bodyModifier = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
     Column(
         modifier = Modifier
@@ -1135,7 +1142,7 @@ private fun RecipePage(
             .padding(
                 start = if (isPhone) 22.dp else 40.dp,
                 end = if (isPhone) 22.dp else 40.dp,
-                top = if (isPhone) 54.dp else 24.dp,
+                top = if (isPhone) 54.dp + phoneVerticalOffset else 24.dp,
                 bottom = if (isPhone) 18.dp else 24.dp
             ),
         verticalArrangement = Arrangement.spacedBy(if (isPhone) 16.dp else 20.dp)

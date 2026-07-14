@@ -113,6 +113,7 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
     val socialRepository = remember { SocialRepository(context.applicationContext) }
     val currentUser by accountRepository.currentUser.collectAsState()
     val inbox by accountRepository.inbox.collectAsState()
+    val subscriberNotifications by accountRepository.subscriberNotifications.collectAsState()
     val hasInboxNotification by accountRepository.hasInboxNotification.collectAsState()
     val publicRecipes by socialRepository.publicRecipes.collectAsState()
     val likedRecipeIds by socialRepository.likedRecipeIds.collectAsState()
@@ -137,6 +138,7 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
     var publicProfileBackScreen by remember { mutableStateOf<AppScreen>(AppScreen.ProfileMenu) }
     var shareToAdd by remember { mutableStateOf<RecipeShare?>(null) }
     var lastInteractionAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var resolvedProfilePhotoUri by remember { mutableStateOf<String?>(null) }
 
     val isEligibleForAmbientMode =
         screen == AppScreen.Home ||
@@ -152,10 +154,17 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
         }
     }
 
-    LaunchedEffect(currentUser?.userId) {
+    LaunchedEffect(currentUser?.userId, currentUser?.profilePhotoUri) {
         repository.setActiveOwner(currentUser?.userId)
-        if (currentUser != null) {
-            runCatching { socialRepository.refresh(currentUser?.userId) }
+        val user = currentUser
+        resolvedProfilePhotoUri = user?.profilePhotoUri
+        if (user != null) {
+            runCatching { socialRepository.refresh(user.userId) }
+            runCatching { socialRepository.loadProfile(user.userId) }
+                .getOrNull()
+                ?.profilePhotoUrl
+                ?.takeIf { it.isNotBlank() }
+                ?.let { resolvedProfilePhotoUri = it }
         }
     }
 
@@ -246,11 +255,10 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
                     lastRecipe = lastRecipe,
                     lastRecipeAlbumName = albums.firstOrNull { it.id == lastRecipe?.albumId }?.name,
                     lastOpenedTimestamp = lastCookingSession?.lastOpenedTimestamp,
-                    profilePhotoUri = currentUser?.profilePhotoUri,
+                    profilePhotoUri = resolvedProfilePhotoUri,
                     hasProfileNotification = hasInboxNotification,
                     onProfile = {
                         accountRepository.refreshInbox()
-                        accountRepository.acknowledgeInboxNotification()
                         screen = AppScreen.ProfileMenu
                     },
                     onTileSelected = { tile ->
@@ -305,7 +313,9 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
                 )
                 AppScreen.ProfileMenu -> currentUser?.let { profile ->
                     ProfileMenuScreen(
-                        profile = profile,
+                        profile = profile.copy(
+                            profilePhotoUri = resolvedProfilePhotoUri ?: profile.profilePhotoUri
+                        ),
                         hasInboxNotification = hasInboxNotification,
                         onBack = { screen = AppScreen.Home },
                         onOpenMyProfile = {
@@ -491,6 +501,7 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
                 AppScreen.ProfileInbox -> currentUser?.let {
                     InboxScreen(
                         inbox = inbox,
+                        subscriberNotifications = subscriberNotifications,
                         onBack = { screen = AppScreen.ProfileMenu },
                         onViewShare = { share ->
                             scope.launch {
@@ -538,6 +549,16 @@ fun RecipeTabletApp(layoutMode: ButteryLayoutMode = ButteryLayoutMode.Tablet) {
                             screen = AppScreen.PublicProfileView(userId)
                         },
                         onSaveProfile = accountRepository::updateProfile,
+                        onDeleteAccount = {
+                            val result = accountRepository.deleteAccount()
+                            if (result.isSuccess) {
+                                runCatching { repository.deleteOwnerData(profile.userId) }
+                                cookingSessionStore.clear()
+                                lastCookingSession = null
+                            }
+                            result
+                        },
+                        onAccountDeleted = { screen = AppScreen.Login },
                         onSignOut = {
                             accountRepository.signOut()
                             screen = AppScreen.Login

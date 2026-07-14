@@ -190,6 +190,12 @@ class RecipeRepository(
         recipeDao.deleteById(id, requireOwner())
     }
 
+    suspend fun deleteOwnerData(ownerId: String) {
+        if (activeOwnerId.value == ownerId) activeOwnerId.value = null
+        recipeDao.deleteByOwner(ownerId)
+        albumDao.deleteByOwner(ownerId)
+    }
+
     private fun RecipeEntity.toDomain() = Recipe(
         id = id,
         title = title,

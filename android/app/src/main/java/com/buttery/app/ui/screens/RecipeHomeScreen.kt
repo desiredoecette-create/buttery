@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -207,6 +208,7 @@ private fun PhoneRecipeHomeScreen(
     onTileSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val dashboardVerticalOffset = (LocalConfiguration.current.screenHeightDp * 0.08f).dp
     Box(modifier = modifier.fillMaxSize()) {
         Image(
             painter = painterResource(R.drawable.home_background),
@@ -231,7 +233,12 @@ private fun PhoneRecipeHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 22.dp, end = 22.dp, top = 86.dp, bottom = 26.dp),
+                .padding(
+                    start = 22.dp,
+                    end = 22.dp,
+                    top = 86.dp + dashboardVerticalOffset,
+                    bottom = 26.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(

@@ -28,15 +28,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DinnerDining
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LocalCafe
+import androidx.compose.material.icons.rounded.LunchDining
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -91,15 +98,15 @@ private val ExploreOlive = Color(0xFF748463)
 
 private enum class ExploreMode { Explore, Following }
 
-private data class ExploreFilter(val label: String, val icon: String, val keywords: List<String>)
+private data class ExploreFilter(val label: String, val icon: ImageVector, val keywords: List<String>)
 
 private val ExploreFilters = listOf(
-    ExploreFilter("All", "✦", emptyList()),
-    ExploreFilter("Breakfast", "☀", listOf("breakfast", "pancake", "waffle", "egg", "toast", "oat")),
-    ExploreFilter("Lunch", "🥪", listOf("lunch", "sandwich", "salad", "soup", "wrap")),
-    ExploreFilter("Dinner", "🍽", listOf("dinner", "pasta", "chicken", "steak", "rice", "lamb", "fish")),
-    ExploreFilter("Desserts", "🧁", listOf("dessert", "cake", "cookie", "brownie", "sweet", "pie")),
-    ExploreFilter("Drinks", "☕", listOf("drink", "coffee", "tea", "smoothie", "cocktail", "juice"))
+    ExploreFilter("All", Icons.Rounded.AutoAwesome, emptyList()),
+    ExploreFilter("Breakfast", Icons.Rounded.WbSunny, listOf("breakfast", "pancake", "waffle", "egg", "toast", "oat")),
+    ExploreFilter("Lunch", Icons.Rounded.LunchDining, listOf("lunch", "sandwich", "salad", "soup", "wrap")),
+    ExploreFilter("Dinner", Icons.Rounded.DinnerDining, listOf("dinner", "pasta", "chicken", "steak", "rice", "lamb", "fish")),
+    ExploreFilter("Desserts", Icons.Rounded.Cake, listOf("dessert", "cake", "cookie", "brownie", "sweet", "pie")),
+    ExploreFilter("Drinks", Icons.Rounded.LocalCafe, listOf("drink", "coffee", "tea", "smoothie", "cocktail", "juice"))
 )
 
 @Composable
@@ -299,7 +306,12 @@ private fun FilterPill(filter: ExploreFilter, selected: Boolean, onClick: () -> 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (isPhone) 4.dp else 6.dp)
         ) {
-            Text(filter.icon, fontSize = if (isPhone) 13.sp else 16.sp)
+            Icon(
+                imageVector = filter.icon,
+                contentDescription = null,
+                tint = if (selected) Color.Black else Color.White,
+                modifier = Modifier.size(if (isPhone) 16.dp else 20.dp)
+            )
             Text(
                 filter.label,
                 color = if (selected) ExploreNavy else ExploreCream,
@@ -594,10 +606,11 @@ private fun PhoneCommunityRecipeDetailDialog(
                                                 label = formatCount(recipe.likeCount),
                                                 tint = if (liked) Color(0xFFD66A5D) else Color.White,
                                                 enabled = currentUserId != null,
+                                                compact = true,
                                                 onClick = onLike
                                             )
-                                            MinimalActionButton(Icons.Rounded.Share, "Share", Color.White, true, onShare)
-                                            MinimalActionButton(Icons.Rounded.BookmarkBorder, "Save", Color.White, true, onSave)
+                                            MinimalActionButton(Icons.Rounded.Share, "Share", Color.White, true, onShare, compact = true)
+                                            MinimalActionButton(Icons.Rounded.BookmarkBorder, "Save", Color.White, true, onSave, compact = true)
                                         }
                                     }
                                 }
@@ -1038,12 +1051,17 @@ private fun MinimalActionButton(
     label: String,
     tint: Color,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    compact: Boolean = false
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(56.dp)) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(if (compact) 46.dp else 56.dp)
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, label, tint = tint, modifier = Modifier.size(25.dp))
-            Text(label, color = tint, fontSize = 10.sp, maxLines = 1)
+            Icon(icon, label, tint = tint, modifier = Modifier.size(if (compact) 21.dp else 25.dp))
+            Text(label, color = tint, fontSize = if (compact) 9.sp else 10.sp, maxLines = 1)
         }
     }
 }

@@ -26,6 +26,9 @@ interface RecipeDao {
     @Query("DELETE FROM recipes WHERE id = :id AND ownerId = :ownerId")
     suspend fun deleteById(id: Long, ownerId: String)
 
+    @Query("DELETE FROM recipes WHERE ownerId = :ownerId")
+    suspend fun deleteByOwner(ownerId: String)
+
     @Query("UPDATE recipes SET isFavorite = :isFavorite, updatedAt = :updatedAt WHERE id = :id AND ownerId = :ownerId")
     suspend fun updateFavorite(id: Long, ownerId: String, isFavorite: Boolean, updatedAt: Long)
 }

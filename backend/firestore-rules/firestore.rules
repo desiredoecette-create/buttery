@@ -50,8 +50,11 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.recipeId is string
         && request.resource.data.ownerId is string;
-      allow read: if signedIn() && resource.data.userId == request.auth.uid;
-      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      // The liker may manage their like. The recipe owner may read/remove likes on their own
+      // recipes so all associated records can be removed during account deletion.
+      allow read, delete: if signedIn()
+        && (resource.data.userId == request.auth.uid
+          || resource.data.ownerId == request.auth.uid);
     }
 
     match /albums/{albumId} {
@@ -87,8 +90,10 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.subscriberUserId == request.auth.uid
         && request.resource.data.subscriberUserId == request.auth.uid;
+      // Either participant may remove a subscription while deleting their Buttery account.
       allow delete: if signedIn()
-        && resource.data.subscriberUserId == request.auth.uid;
+        && (resource.data.subscriberUserId == request.auth.uid
+          || resource.data.creatorUserId == request.auth.uid);
     }
   }
 }

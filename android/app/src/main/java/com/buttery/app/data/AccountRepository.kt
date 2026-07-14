@@ -3,13 +3,14 @@ package com.buttery.app.data
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import com.buttery.app.R
 import com.buttery.app.domain.Recipe
 import com.google.android.gms.tasks.Task
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.AuthResult
@@ -18,12 +19,14 @@ import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.google.firebase.storage.StorageException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,6 +83,15 @@ data class RecipeShare(
     val updatedAt: Long
 )
 
+data class SubscriberNotification(
+    val subscriptionId: String,
+    val subscriberUserId: String,
+    val subscriberUsername: String,
+    val subscriberDisplayName: String,
+    val subscriberProfilePhotoUri: String?,
+    val createdAt: Long
+)
+
 sealed interface AccountResult {
     data class Success(val profile: UserProfile) : AccountResult
     data class UsernameRequired(
@@ -105,12 +117,20 @@ class AccountRepository(context: Context) {
 
     private var authListener: FirebaseAuth.AuthStateListener? = null
     private var inboxListener: ListenerRegistration? = null
+    private var subscriberInboxListener: ListenerRegistration? = null
+    private val inboxPreferences = appContext.getSharedPreferences(
+        "buttery_inbox_state",
+        Context.MODE_PRIVATE
+    )
 
     private val _currentUser = MutableStateFlow<UserProfile?>(null)
     val currentUser: StateFlow<UserProfile?> = _currentUser
 
     private val _inbox = MutableStateFlow<List<RecipeShare>>(emptyList())
     val inbox: StateFlow<List<RecipeShare>> = _inbox
+
+    private val _subscriberNotifications = MutableStateFlow<List<SubscriberNotification>>(emptyList())
+    val subscriberNotifications: StateFlow<List<SubscriberNotification>> = _subscriberNotifications
 
     private val _hasInboxNotification = MutableStateFlow(false)
     val hasInboxNotification: StateFlow<Boolean> = _hasInboxNotification
@@ -176,16 +196,11 @@ class AccountRepository(context: Context) {
     )
 
     suspend fun signInWithGoogle(activity: Activity): AccountResult = runCatching {
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(
-                resolveGeneratedString("default_web_client_id")
-                    ?: throw IllegalStateException(
-                        "Google Sign-In needs an Android google-services.json that includes a Web OAuth client."
-                    )
+        val serverClientId = resolveGeneratedString("default_web_client_id")
+            ?: throw IllegalStateException(
+                "Google Sign-In needs an Android google-services.json that includes a Web OAuth client."
             )
-            .setAutoSelectEnabled(false)
-            .build()
+        val googleIdOption = GetSignInWithGoogleOption.Builder(serverClientId).build()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
             .build()
@@ -206,10 +221,18 @@ class AccountRepository(context: Context) {
     }.fold(
         onSuccess = { it },
         onFailure = {
+            Log.e("ButteryGoogleSignIn", "Google sign-in failed", it)
             AccountResult.Error(
                 when (it) {
                     is androidx.credentials.exceptions.GetCredentialCancellationException ->
-                        "Google Sign-In was canceled."
+                        it.message
+                            ?.takeUnless { message ->
+                                message.equals("activity is cancelled by the user.", ignoreCase = true)
+                            }
+                            ?.let { message -> "Google Sign-In couldn't finish: $message" }
+                            ?: "Google Sign-In was canceled."
+                    is androidx.credentials.exceptions.NoCredentialException ->
+                        "No Google account is available. Add a Google account to this phone, then try again."
                     else -> friendlyMessage(it)
                 }
             )
@@ -220,6 +243,62 @@ class AccountRepository(context: Context) {
         auth.signOut()
         setSignedOut()
     }
+
+    suspend fun deleteAccount(): Result<Unit> = runCatching {
+        val user = auth.currentUser ?: throw IllegalStateException("Your session expired. Sign in again first.")
+        val profile = _currentUser.value ?: throw IllegalStateException("Your profile could not be loaded.")
+        val lastSignInAt = user.metadata?.lastSignInTimestamp ?: 0L
+        if (lastSignInAt == 0L || System.currentTimeMillis() - lastSignInAt > RECENT_LOGIN_WINDOW_MS) {
+            throw IllegalStateException(
+                "For your security, sign out and sign back in before deleting your account."
+            )
+        }
+
+        val sentShares = documentsWhere(SHARES, "fromUserId", user.uid)
+        val receivedShares = documentsWhere(SHARES, "toUserId", user.uid)
+        val ownedRecipes = documentsWhere(RECIPES, "ownerId", user.uid)
+        val createdLikes = documentsWhere(RECIPE_LIKES, "userId", user.uid)
+        val receivedLikes = documentsWhere(RECIPE_LIKES, "ownerId", user.uid)
+        val sentSubscriptions = documentsWhere(SUBSCRIPTIONS, "subscriberUserId", user.uid)
+        val receivedSubscriptions = documentsWhere(SUBSCRIPTIONS, "creatorUserId", user.uid)
+
+        val ownedMediaUrls = buildSet {
+            profile.profilePhotoUri?.let(::add)
+            sentShares.forEach { document ->
+                val snapshot = document.get("recipeSnapshot") as? Map<*, *> ?: return@forEach
+                (snapshot["photoUrls"] as? List<*>)?.mapNotNullTo(this) { it as? String }
+                (snapshot["videoUrl"] as? String)?.takeIf { it.isNotBlank() }?.let(::add)
+            }
+            ownedRecipes.forEach { document ->
+                (document.get("photoUrls") as? List<*>)?.mapNotNullTo(this) { it as? String }
+                (document.get("videoUrls") as? List<*>)?.mapNotNullTo(this) { it as? String }
+                document.getString("thumbnailUrl")?.takeIf { it.isNotBlank() }?.let(::add)
+                document.getString("videoUrl")?.takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }
+        ownedMediaUrls.forEach { deleteOwnedStorageObjectIfPresent(it, user.uid) }
+
+        val references = buildList<DocumentReference> {
+            addAll((sentShares + receivedShares).map { it.reference })
+            addAll(ownedRecipes.map { it.reference })
+            addAll((createdLikes + receivedLikes).map { it.reference })
+            addAll((sentSubscriptions + receivedSubscriptions).map { it.reference })
+            add(database.collection(PUBLIC_PROFILES).document(user.uid))
+            add(database.collection(USERNAMES).document(profile.username.lowercase()))
+            add(database.collection(USERS).document(user.uid))
+        }.associateBy { it.path }.values
+        references.chunked(FIRESTORE_DELETE_BATCH_SIZE).forEach { chunk ->
+            val batch = database.batch()
+            chunk.forEach(batch::delete)
+            batch.commit().await()
+        }
+
+        user.delete().await()
+        setSignedOut()
+    }.fold(
+        onSuccess = { Result.success(Unit) },
+        onFailure = { Result.failure(IllegalStateException(friendlyMessage(it), it)) }
+    )
 
     private suspend fun openFederatedProfileOrRequestUsername(user: FirebaseUser): AccountResult {
         val existing = loadProfile(user)
@@ -483,7 +562,11 @@ class AccountRepository(context: Context) {
     }
 
     fun acknowledgeInboxNotification() {
-        _hasInboxNotification.value = false
+        val userId = _currentUser.value?.userId ?: return
+        inboxPreferences.edit()
+            .putLong(lastInboxViewedKey(userId), System.currentTimeMillis())
+            .apply()
+        recomputeInboxNotification()
     }
 
     private suspend fun reserveUsernameAndCreateProfile(
@@ -511,6 +594,8 @@ class AccountRepository(context: Context) {
                     "displayName" to displayName,
                     "profilePhotoUrl" to (user.photoUrl?.toString() ?: ""),
                     "provider" to provider,
+                    "termsVersion" to TERMS_VERSION,
+                    "termsAcceptedAt" to now,
                     "createdAt" to now,
                     "updatedAt" to now,
                     "schemaVersion" to 1
@@ -531,6 +616,7 @@ class AccountRepository(context: Context) {
     private fun setSignedOut() {
         _currentUser.value = null
         _inbox.value = emptyList()
+        _subscriberNotifications.value = emptyList()
         _hasInboxNotification.value = false
         listenForInbox(null)
     }
@@ -538,6 +624,8 @@ class AccountRepository(context: Context) {
     private fun listenForInbox(userId: String?) {
         inboxListener?.remove()
         inboxListener = null
+        subscriberInboxListener?.remove()
+        subscriberInboxListener = null
         if (userId == null) return
         inboxListener = database.collection(SHARES)
             .whereEqualTo("toUserId", userId)
@@ -548,9 +636,31 @@ class AccountRepository(context: Context) {
                     ?.sortedByDescending { it.createdAt }
                     .orEmpty()
                 _inbox.value = items
-                _hasInboxNotification.value = items.any { it.status == STATUS_PENDING }
+                recomputeInboxNotification()
+            }
+        subscriberInboxListener = database.collection(SUBSCRIPTIONS)
+            .whereEqualTo("creatorUserId", userId)
+            .addSnapshotListener { snapshot, _ ->
+                _subscriberNotifications.value = snapshot?.documents
+                    ?.mapNotNull { it.toSubscriberNotification() }
+                    ?.sortedByDescending { it.createdAt }
+                    .orEmpty()
+                recomputeInboxNotification()
             }
     }
+
+    private fun recomputeInboxNotification() {
+        val userId = _currentUser.value?.userId ?: run {
+            _hasInboxNotification.value = false
+            return
+        }
+        val lastViewedAt = inboxPreferences.getLong(lastInboxViewedKey(userId), 0L)
+        _hasInboxNotification.value =
+            _inbox.value.any { it.createdAt > lastViewedAt } ||
+                _subscriberNotifications.value.any { it.createdAt > lastViewedAt }
+    }
+
+    private fun lastInboxViewedKey(userId: String) = "last_inbox_viewed_at_$userId"
 
     private suspend fun uploadProfilePhotoIfNeeded(ownerId: String, photoUri: String?): String? {
         if (photoUri.isNullOrBlank()) return null
@@ -608,6 +718,27 @@ class AccountRepository(context: Context) {
             bytes
         }
 
+    private suspend fun documentsWhere(
+        collection: String,
+        field: String,
+        value: String
+    ): List<DocumentSnapshot> = database.collection(collection)
+        .whereEqualTo(field, value)
+        .get()
+        .await()
+        .documents
+
+    private suspend fun deleteOwnedStorageObjectIfPresent(url: String, ownerId: String) {
+        val reference = runCatching { storage.getReferenceFromUrl(url) }.getOrNull() ?: return
+        val normalizedPath = reference.path.trimStart('/')
+        if (!normalizedPath.startsWith("users/$ownerId/")) return
+        try {
+            reference.delete().await()
+        } catch (error: StorageException) {
+            if (error.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND) throw error
+        }
+    }
+
     private fun DocumentSnapshot.toProfile(user: FirebaseUser? = null): UserProfile? {
         if (!exists()) return null
         val username = getString("username")?.takeIf { it.isNotBlank() } ?: return null
@@ -624,6 +755,10 @@ class AccountRepository(context: Context) {
 
     private fun DocumentSnapshot.toShare(): RecipeShare? {
         val snapshot = get("recipeSnapshot") as? Map<*, *> ?: return null
+        val recipeTitle = (snapshot["title"] as? String)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
         val photos = (snapshot["photoUrls"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
         val imageUrl = (snapshot["imageUrl"] as? String)?.takeIf { it.isNotBlank() }
         return RecipeShare(
@@ -636,7 +771,7 @@ class AccountRepository(context: Context) {
             toUserId = getString("toUserId") ?: return null,
             toUsername = getString("toUsername") ?: "",
             recipe = SharedRecipeSnapshot(
-                title = snapshot["title"] as? String ?: return null,
+                title = recipeTitle,
                 notes = snapshot["notes"] as? String ?: "",
                 prepTime = snapshot["prepTime"] as? String ?: "",
                 cookTime = snapshot["cookTime"] as? String ?: "",
@@ -655,6 +790,21 @@ class AccountRepository(context: Context) {
             status = getString("status") ?: STATUS_PENDING,
             createdAt = getTimestamp("createdAt").toMillisOrNow(),
             updatedAt = getTimestamp("updatedAt").toMillisOrNow()
+        )
+    }
+
+    private fun DocumentSnapshot.toSubscriberNotification(): SubscriberNotification? {
+        val subscriberUserId = getString("subscriberUserId") ?: return null
+        return SubscriberNotification(
+            subscriptionId = getString("subscriptionId") ?: id,
+            subscriberUserId = subscriberUserId,
+            subscriberUsername = getString("subscriberUsername") ?: "buttery_user",
+            subscriberDisplayName = getString("subscriberDisplayName")
+                ?: getString("subscriberUsername")
+                ?: "Buttery user",
+            subscriberProfilePhotoUri = getString("subscriberProfilePhotoUrl")
+                ?.takeIf { it.isNotBlank() },
+            createdAt = getTimestamp("createdAt").toMillisOrNow()
         )
     }
 
@@ -714,6 +864,13 @@ class AccountRepository(context: Context) {
         private const val USERS = "users"
         private const val USERNAMES = "usernames"
         private const val SHARES = "recipeShares"
+        private const val SUBSCRIPTIONS = "subscriptions"
+        private const val PUBLIC_PROFILES = "publicProfiles"
+        private const val RECIPES = "recipes"
+        private const val RECIPE_LIKES = "recipeLikes"
+        private const val TERMS_VERSION = "2026-07-13"
+        private const val RECENT_LOGIN_WINDOW_MS = 5 * 60 * 1000L
+        private const val FIRESTORE_DELETE_BATCH_SIZE = 450
         private val USERNAME = Regex("^[A-Za-z0-9_]{3,24}$")
         private val EMAIL = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
     }

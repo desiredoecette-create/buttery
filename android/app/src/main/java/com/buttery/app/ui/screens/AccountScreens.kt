@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Inbox
@@ -43,6 +44,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,6 +73,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -83,6 +86,7 @@ import com.buttery.app.data.AccountResult
 import com.buttery.app.data.CommunityRecipe
 import com.buttery.app.data.RecipeShare
 import com.buttery.app.data.SharedRecipeSnapshot
+import com.buttery.app.data.SubscriberNotification
 import com.buttery.app.data.UserProfile
 import com.buttery.app.domain.Recipe
 import com.buttery.app.domain.RecipeAlbum
@@ -183,6 +187,8 @@ fun LoginScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var providerSignInRunning by remember { mutableStateOf(false) }
     var emailSignInRunning by remember { mutableStateOf(false) }
+    var termsAccepted by remember { mutableStateOf(false) }
+    var showTerms by remember { mutableStateOf(false) }
     var pendingGoogleAccount by remember {
         mutableStateOf<AccountResult.UsernameRequired?>(null)
     }
@@ -204,6 +210,9 @@ fun LoginScreen(
             providerSignInRunning = providerSignInRunning,
             emailSignInRunning = emailSignInRunning,
             pendingGoogleAccount = pendingGoogleAccount,
+            termsAccepted = termsAccepted,
+            onTermsAcceptedChange = { termsAccepted = it },
+            onShowTerms = { showTerms = true },
             onGoogleClick = {
                 if (!providerSignInRunning) {
                     providerSignInRunning = true
@@ -225,6 +234,10 @@ fun LoginScreen(
             },
             onEmailSubmit = {
                 if (!emailSignInRunning) {
+                    if (mode == AuthMode.SIGN_UP && !termsAccepted) {
+                        message = "Accept the Terms of Use to create your account."
+                        return@PhoneLoginScreenContent
+                    }
                     emailSignInRunning = true
                     message = null
                     scope.launch {
@@ -241,6 +254,10 @@ fun LoginScreen(
             onCompleteGoogle = {
                 val pending = pendingGoogleAccount ?: return@PhoneLoginScreenContent
                 if (!providerSignInRunning) {
+                    if (!termsAccepted) {
+                        message = "Accept the Terms of Use to create your account."
+                        return@PhoneLoginScreenContent
+                    }
                     providerSignInRunning = true
                     message = "Finishing sign-up…"
                     scope.launch {
@@ -260,6 +277,9 @@ fun LoginScreen(
                 }
             }
         )
+        if (showTerms) {
+            TermsOfUseDialog(onDismiss = { showTerms = false })
+        }
         return
     }
 
@@ -356,6 +376,13 @@ fun LoginScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (mode == AuthMode.SIGN_UP) {
+                            TermsAcceptanceRow(
+                                accepted = termsAccepted,
+                                onAcceptedChange = { termsAccepted = it },
+                                onShowTerms = { showTerms = true }
+                            )
+                        }
                         Button(
                             onClick = {
                                 if (!emailSignInRunning) {
@@ -363,7 +390,11 @@ fun LoginScreen(
                                     message = null
                                     scope.launch {
                                         val result = if (mode == AuthMode.SIGN_UP) {
-                                            onSignUp(username, email, password, displayName)
+                                            if (!termsAccepted) {
+                                                AccountResult.Error("Accept the Terms of Use to create your account.")
+                                            } else {
+                                                onSignUp(username, email, password, displayName)
+                                            }
                                         } else {
                                             onSignIn(email, password)
                                         }
@@ -372,7 +403,7 @@ fun LoginScreen(
                                     }
                                 }
                             },
-                            enabled = !emailSignInRunning,
+                            enabled = !emailSignInRunning && (mode != AuthMode.SIGN_UP || termsAccepted),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -392,9 +423,14 @@ fun LoginScreen(
                             fontSize = 16.sp
                         )
                         AccountField(username, { username = it }, "Username")
+                        TermsAcceptanceRow(
+                            accepted = termsAccepted,
+                            onAcceptedChange = { termsAccepted = it },
+                            onShowTerms = { showTerms = true }
+                        )
                         Button(
                             onClick = {
-                                if (!providerSignInRunning) {
+                                if (!providerSignInRunning && termsAccepted) {
                                     providerSignInRunning = true
                                     message = null
                                     scope.launch {
@@ -413,7 +449,7 @@ fun LoginScreen(
                                     }
                                 }
                             },
-                            enabled = !providerSignInRunning,
+                            enabled = !providerSignInRunning && termsAccepted,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -423,6 +459,9 @@ fun LoginScreen(
                 }
             }
         }
+    }
+    if (showTerms) {
+        TermsOfUseDialog(onDismiss = { showTerms = false })
     }
 }
 
@@ -442,10 +481,14 @@ private fun PhoneLoginScreenContent(
     providerSignInRunning: Boolean,
     emailSignInRunning: Boolean,
     pendingGoogleAccount: AccountResult.UsernameRequired?,
+    termsAccepted: Boolean,
+    onTermsAcceptedChange: (Boolean) -> Unit,
+    onShowTerms: () -> Unit,
     onGoogleClick: () -> Unit,
     onEmailSubmit: () -> Unit,
     onCompleteGoogle: () -> Unit
 ) {
+    val loginVerticalOffset = (LocalConfiguration.current.screenHeightDp * 0.07f).dp
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -459,7 +502,12 @@ private fun PhoneLoginScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 40.dp),
+                .padding(
+                    start = 24.dp,
+                    end = 24.dp,
+                    top = 40.dp + loginVerticalOffset,
+                    bottom = 40.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -502,7 +550,9 @@ private fun PhoneLoginScreenContent(
                         },
                         color = AccountInk,
                         fontFamily = FontFamily.Serif,
-                        fontSize = 28.sp
+                        fontSize = 28.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     if (pendingGoogleAccount != null) {
@@ -512,9 +562,14 @@ private fun PhoneLoginScreenContent(
                             fontSize = 15.sp
                         )
                         AccountField(username, onUsernameChange, "Username")
+                        TermsAcceptanceRow(
+                            accepted = termsAccepted,
+                            onAcceptedChange = onTermsAcceptedChange,
+                            onShowTerms = onShowTerms
+                        )
                         Button(
                             onClick = onCompleteGoogle,
-                            enabled = !providerSignInRunning,
+                            enabled = !providerSignInRunning && termsAccepted,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -561,9 +616,16 @@ private fun PhoneLoginScreenContent(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (mode == AuthMode.SIGN_UP) {
+                            TermsAcceptanceRow(
+                                accepted = termsAccepted,
+                                onAcceptedChange = onTermsAcceptedChange,
+                                onShowTerms = onShowTerms
+                            )
+                        }
                         Button(
                             onClick = onEmailSubmit,
-                            enabled = !emailSignInRunning,
+                            enabled = !emailSignInRunning && (mode != AuthMode.SIGN_UP || termsAccepted),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AccountButter)
                         ) {
@@ -598,6 +660,52 @@ private fun PhoneLoginScreenContent(
             }
         }
     }
+}
+
+@Composable
+private fun TermsAcceptanceRow(
+    accepted: Boolean,
+    onAcceptedChange: (Boolean) -> Unit,
+    onShowTerms: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = accepted, onCheckedChange = onAcceptedChange)
+        Column(modifier = Modifier.weight(1f)) {
+            Text("I agree to Buttery's Terms of Use.", color = AccountInk, fontSize = 14.sp)
+            TextButton(onClick = onShowTerms) {
+                Text("Read Terms of Use", color = AccountNavy)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TermsOfUseDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Buttery Terms of Use") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("Effective July 13, 2026")
+                Text("You must be at least 13 years old to create a Buttery account and must provide accurate account information.")
+                Text("You keep ownership of recipes and media you submit. You give Buttery permission to store, process, and display content as needed to provide sharing, profiles, subscriptions, and recipe discovery.")
+                Text("Do not upload unlawful, abusive, misleading, infringing, sexually explicit, dangerous, or privacy-violating content. Do not harass other users or misuse sharing and subscription features.")
+                Text("Buttery may remove content or suspend accounts to protect users, comply with law, or enforce these terms. Features may change, and the service is provided without a guarantee that it will always be uninterrupted or error-free.")
+                Text("You may permanently delete your account and associated Buttery cloud data from Settings. These terms are governed by applicable law where you live.")
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = AccountButter)) {
+                Text("Close", color = AccountNavy)
+            }
+        }
+    )
 }
 
 @Composable
@@ -819,12 +927,17 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenPublicProfile: (String) -> Unit,
     onSaveProfile: suspend (String, String?) -> AccountResult,
+    onDeleteAccount: suspend () -> Result<Unit>,
+    onAccountDeleted: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 700
     var displayName by remember(profile.userId, profile.displayName) { mutableStateOf(profile.displayName) }
     var photoUri by remember(profile.userId, profile.profilePhotoUri) { mutableStateOf(profile.profilePhotoUri) }
     var message by remember { mutableStateOf<String?>(null) }
     var savingProfile by remember { mutableStateOf(false) }
+    var deletingAccount by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -846,38 +959,56 @@ fun SettingsScreen(
     Box(
         Modifier.fillMaxSize().background(
             Brush.radialGradient(listOf(Color(0xFF293A43), AccountNavy), radius = 1500f)
-        ).padding(26.dp)
+        ).padding(
+            start = if (isPhone) 18.dp else 26.dp,
+            end = if (isPhone) 18.dp else 26.dp,
+            top = if (isPhone) 54.dp else 26.dp,
+            bottom = if (isPhone) 18.dp else 26.dp
+        )
     ) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(if (isPhone) 14.dp else 18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = AccountPanel)) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, null)
-                    Text("  Menu")
+                    if (!isPhone) Text("  Menu")
                 }
                 Text(
                     "Settings",
                     color = AccountCream,
                     fontFamily = FontFamily.Serif,
-                    fontSize = 38.sp,
-                    modifier = Modifier.padding(start = 20.dp)
+                    fontSize = if (isPhone) 34.sp else 38.sp,
+                    modifier = Modifier.padding(start = if (isPhone) 14.dp else 20.dp)
                 )
                 Spacer(Modifier.weight(1f))
                 Button(onClick = onSignOut, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))) {
                     Icon(Icons.Rounded.Logout, null)
-                    Text("  Sign out")
+                    if (!isPhone) Text("  Sign out")
                 }
             }
             Surface(
-                modifier = Modifier.fillMaxWidth(0.62f).fillMaxHeight().align(Alignment.CenterHorizontally),
+                modifier = if (isPhone) {
+                    Modifier.fillMaxWidth().weight(1f)
+                } else {
+                    Modifier.fillMaxWidth(0.62f).fillMaxHeight().align(Alignment.CenterHorizontally)
+                },
                 color = AccountCream,
                 shape = RoundedCornerShape(22.dp)
             ) {
                 Column(
-                    Modifier.padding(30.dp),
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(if (isPhone) 20.dp else 30.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 14.dp)
                 ) {
-                    ProfileAvatar(photoUri, 122)
+                    ProfileAvatar(photoUri, if (isPhone) 92 else 122)
                     Button(
                         onClick = { onOpenPublicProfile(profile.userId) },
                         modifier = Modifier.fillMaxWidth(),
@@ -935,15 +1066,91 @@ fun SettingsScreen(
                         }
                     }
                     message?.let { Text(it, color = AccountInk) }
+                    Spacer(Modifier.size(4.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFF6F3D39).copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "Delete Account",
+                                color = Color(0xFF6F3D39),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                "Permanently deletes your Buttery account, profile, recipes on this device, shared-recipe records, public recipes, subscriptions, likes, and uploaded media. This cannot be undone.",
+                                color = AccountInk.copy(alpha = 0.72f),
+                                fontSize = 13.sp
+                            )
+                            Button(
+                                onClick = { showDeleteConfirmation = true },
+                                enabled = !deletingAccount,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))
+                            ) {
+                                if (deletingAccount) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color.White
+                                    )
+                                    Text("  Deleting…", color = Color.White)
+                                } else {
+                                    Icon(Icons.Rounded.Delete, null, tint = Color.White)
+                                    Text("  Delete My Account", color = Color.White)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!deletingAccount) showDeleteConfirmation = false },
+            title = { Text("Permanently delete your account?") },
+            text = {
+                Text("Your account and associated Buttery data will be permanently deleted. This action cannot be undone.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletingAccount = true
+                        showDeleteConfirmation = false
+                        message = null
+                        scope.launch {
+                            val result = onDeleteAccount()
+                            if (result.isSuccess) {
+                                onAccountDeleted()
+                            } else {
+                                message = result.exceptionOrNull()?.localizedMessage
+                                    ?: "Your account could not be deleted. Please try again."
+                                deletingAccount = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6F3D39))
+                ) {
+                    Text("Delete Account Permanently", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
 @Composable
 fun InboxScreen(
     inbox: List<RecipeShare>,
+    subscriberNotifications: List<SubscriberNotification>,
     onBack: () -> Unit,
     onViewShare: (RecipeShare) -> Unit,
     onAddShare: (RecipeShare) -> Unit,
@@ -975,18 +1182,37 @@ fun InboxScreen(
                     modifier = Modifier.padding(start = 20.dp)
                 )
                 Spacer(Modifier.weight(1f))
-                Text("${inbox.size} received", color = AccountCream.copy(alpha = 0.72f), fontSize = if (isPhone) 14.sp else 18.sp)
+                Text(
+                    "${inbox.size + subscriberNotifications.size} received",
+                    color = AccountCream.copy(alpha = 0.72f),
+                    fontSize = if (isPhone) 14.sp else 18.sp
+                )
             }
             Surface(modifier = Modifier.fillMaxSize(), color = AccountCream, shape = RoundedCornerShape(22.dp)) {
-                if (inbox.isEmpty()) {
+                if (inbox.isEmpty() && subscriberNotifications.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Shared recipes will appear here.", color = AccountInk.copy(alpha = 0.55f))
+                        Text(
+                            "Notifications and shared recipes will appear here.",
+                            color = AccountInk.copy(alpha = 0.55f)
+                        )
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.padding(if (isPhone) 14.dp else 24.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        items(
+                            subscriberNotifications,
+                            key = { "subscription_${it.subscriptionId}" }
+                        ) { notification ->
+                            SubscriberInboxCard(
+                                notification = notification,
+                                isPhone = isPhone,
+                                onOpenProfile = {
+                                    onOpenPublicProfile(notification.subscriberUserId)
+                                }
+                            )
+                        }
                         items(inbox, key = { it.shareId }) { share ->
                             InboxCard(
                                 share = share,
@@ -1000,6 +1226,42 @@ fun InboxScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SubscriberInboxCard(
+    notification: SubscriberNotification,
+    isPhone: Boolean,
+    onOpenProfile: () -> Unit
+) {
+    Card(
+        onClick = onOpenProfile,
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.72f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (isPhone) 14.dp else 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProfileAvatar(notification.subscriberProfilePhotoUri, if (isPhone) 44 else 46)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    "${notification.subscriberDisplayName} subscribed to you",
+                    color = AccountInk,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2
+                )
+                Text(
+                    "@${notification.subscriberUsername}",
+                    color = AccountInk.copy(alpha = 0.62f),
+                    fontSize = if (isPhone) 13.sp else 14.sp
+                )
+            }
+            Icon(Icons.Rounded.Person, contentDescription = null, tint = AccountNavy)
         }
     }
 }
